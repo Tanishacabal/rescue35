@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "525221869357",
+    "project_id": "rescue35-951fc",
+    "storage_bucket": "rescue35-951fc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:525221869357:android:a1cb401ba93b87efb405a4",
+        "android_client_info": {
+          "package_name": "com.example.rescue35"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD4s6Kd2Oi7UPL7RRQLUS5--0jmT9wcesw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
