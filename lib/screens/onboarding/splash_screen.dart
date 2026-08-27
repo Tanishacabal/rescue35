@@ -33,10 +33,9 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     Widget nextScreen = const OnboardingScreen();
-    final user = FirebaseAuth.instance.currentUser;
-
-    if (user != null) {
-      try {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
         final role = await AuthService().getUserRole();
         if (role == 'admin') {
           await AuthService().logout();
@@ -45,9 +44,9 @@ class _SplashScreenState extends State<SplashScreen>
               ? const ResponderDashboard()
               : const CitizenDashboard();
         }
-      } catch (_) {
-        nextScreen = const OnboardingScreen();
       }
+    } catch (_) {
+      nextScreen = const OnboardingScreen();
     }
 
     if (!mounted) return;
