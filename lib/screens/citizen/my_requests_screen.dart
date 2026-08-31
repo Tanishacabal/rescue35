@@ -16,21 +16,7 @@ class MyRequestsScreen extends StatelessWidget {
     return RescueGradientScaffold(
       child: Column(
         children: [
-          AppBar(
-            title: const Text('My Requests'),
-            actions: [
-              IconButton(
-                tooltip: 'Profile',
-                icon: const Icon(Icons.person_outline_rounded),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ProfileScreen(role: 'citizen'),
-                  ),
-                ),
-              ),
-            ],
-          ),
+          const _ScreenHeader(),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
@@ -42,23 +28,18 @@ class MyRequestsScreen extends StatelessWidget {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (snap.hasError) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Text(
-                        'Unable to load requests right now.\n${snap.error}',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: AppColors.textGray),
-                      ),
-                    ),
+                  return _EmptyState(
+                    icon: Icons.error_outline_rounded,
+                    iconColor: AppColors.pending,
+                    title: 'Something went wrong',
+                    subtitle: 'Unable to load requests right now.\n${snap.error}',
                   );
                 }
                 if (!snap.hasData || snap.data!.docs.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'No requests yet.',
-                      style: TextStyle(color: AppColors.textGray),
-                    ),
+                  return const _EmptyState(
+                    icon: Icons.inbox_outlined,
+                    title: 'No requests yet',
+                    subtitle: 'Your transport requests will show up here once you\nsubmit one.',
                   );
                 }
                 final docs = [...snap.data!.docs]
@@ -73,9 +54,9 @@ class MyRequestsScreen extends StatelessWidget {
                   });
 
                 return ListView.separated(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   itemCount: docs.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, i) {
                     return _RequestCard(doc: docs[i]);
                   },
@@ -88,6 +69,119 @@ class MyRequestsScreen extends StatelessWidget {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Header
+// ---------------------------------------------------------------------------
+
+class _ScreenHeader extends StatelessWidget {
+  const _ScreenHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'My Requests',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.dark,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Track the status of your transport requests',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textGray,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton.filledTonal(
+            style: IconButton.styleFrom(
+              backgroundColor: AppColors.primary.withValues(alpha: 0.10),
+              foregroundColor: AppColors.primary,
+            ),
+            tooltip: 'Profile',
+            icon: const Icon(Icons.person_outline_rounded),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ProfileScreen(role: 'citizen'),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.iconColor,
+  });
+
+  final IconData icon;
+  final Color? iconColor;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = iconColor ?? AppColors.textGray;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 36, color: color),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+                color: AppColors.dark,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.textGray, height: 1.4),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Request card
+// ---------------------------------------------------------------------------
 
 /// Renders one transport request card. Patient details (name, age, sex,
 /// contact number, barangay) live in a separate `patients` collection —
@@ -104,6 +198,7 @@ class _RequestCard extends StatefulWidget {
 
 class _RequestCardState extends State<_RequestCard> {
   late Future<DocumentSnapshot<Map<String, dynamic>>?> _patientFuture;
+  bool _expanded = false;
 
   @override
   void initState() {
@@ -170,7 +265,8 @@ class _RequestCardState extends State<_RequestCard> {
         final patientLoading =
             patientSnap.connectionState == ConnectionState.waiting;
 
-        final status = requestData['status'] ?? 'pending';
+        final status = (requestData['status'] ?? 'pending').toString();
+        final color = _statusColor(status);
 
         final rawPatientName = (patientData['patientname'] ??
                 requestData['patientName'] ??
@@ -198,74 +294,162 @@ class _RequestCardState extends State<_RequestCard> {
             : '-';
         final scheduleTime = (requestData['scheduleTime'] ?? '-').toString();
         final notes = (requestData['additionalNotes'] ?? '').toString().trim();
+        final description = (requestData['description'] ?? '-').toString();
 
         return GlassCard(
+          radius: 20,
+          padding: const EdgeInsets.all(0),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
+              // Colored top accent to make status scannable at a glance.
+              Container(
+                height: 4,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          patientName,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.dark,
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(Icons.route_outlined, color: color, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                patientName,
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.dark,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                (requestData['trackingNumber'] ?? widget.doc.id).toString(),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textGray,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          requestData['trackingNumber'] ?? widget.doc.id,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textGray,
-                            fontWeight: FontWeight.w700,
+                        _StatusBadge(status: status, color: color),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.location_on_outlined,
+                            size: 17, color: AppColors.secondary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            location,
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  _statusBadge(status),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  const Icon(Icons.location_on_outlined,
-                      size: 18, color: AppColors.secondary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      location,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    const SizedBox(height: 8),
+                    Text(
+                      '$description\nSubmitted: $date',
+                      style: const TextStyle(color: AppColors.textGray, height: 1.4, fontSize: 12.5),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () => setState(() => _expanded = !_expanded),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          children: [
+                            Text(
+                              _expanded ? 'Hide details' : 'View details',
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            AnimatedRotation(
+                              turns: _expanded ? 0.5 : 0,
+                              duration: const Duration(milliseconds: 200),
+                              child: const Icon(Icons.keyboard_arrow_down_rounded,
+                                  color: AppColors.primary, size: 18),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    AnimatedCrossFade(
+                      duration: const Duration(milliseconds: 220),
+                      crossFadeState:
+                          _expanded ? CrossFadeState.showFirst : CrossFadeState.showSecond,
+                      firstChild: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Divider(height: 22),
+                          _DetailRow(
+                            icon: Icons.badge_outlined,
+                            label: 'Patient',
+                            value: [
+                              age.isEmpty ? null : '$age yrs old',
+                              sex.isEmpty ? null : sex,
+                            ].whereType<String>().join(' · '),
+                          ),
+                          _DetailRow(
+                            icon: Icons.phone_outlined,
+                            label: 'Contact',
+                            value: contactNumber,
+                          ),
+                          _DetailRow(
+                            icon: Icons.map_outlined,
+                            label: 'Barangay',
+                            value: barangay,
+                          ),
+                          _DetailRow(
+                            icon: Icons.local_hospital_outlined,
+                            label: 'Destination',
+                            value: hospital,
+                          ),
+                          _DetailRow(
+                            icon: Icons.event_outlined,
+                            label: 'Schedule',
+                            value: '$scheduleDateStr · $scheduleTime',
+                          ),
+                          if (notes.isNotEmpty)
+                            _DetailRow(
+                              icon: Icons.note_alt_outlined,
+                              label: 'Notes',
+                              value: notes,
+                              isLast: true,
+                            ),
+                        ],
+                      ),
+                      secondChild: const SizedBox.shrink(),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 6),
-              Text(
-                '${requestData['description'] ?? '-'}\nSubmitted: $date',
-                style: const TextStyle(color: AppColors.textGray, height: 1.35),
-              ),
-              const Divider(height: 26),
-              _detailRow(
-                  Icons.badge_outlined,
-                  'Patient',
-                  [age.isEmpty ? null : '$age yrs old', sex.isEmpty ? null : sex]
-                      .whereType<String>()
-                      .join(' · ')),
-              _detailRow(Icons.phone_outlined, 'Contact', contactNumber),
-              _detailRow(Icons.map_outlined, 'Barangay', barangay),
-              _detailRow(
-                  Icons.local_hospital_outlined, 'Destination', hospital),
-              _detailRow(Icons.event_outlined, 'Schedule',
-                  '$scheduleDateStr · $scheduleTime'),
-              if (notes.isNotEmpty)
-                _detailRow(Icons.note_alt_outlined, 'Notes', notes),
             ],
           ),
         );
@@ -273,22 +457,44 @@ class _RequestCardState extends State<_RequestCard> {
     );
   }
 
-  Widget _detailRow(IconData icon, String label, String value) {
+  static Color _statusColor(String status) => switch (status) {
+        'approved' => AppColors.secondary,
+        'in-transit' => AppColors.accent,
+        'completed' => AppColors.completed,
+        _ => AppColors.pending,
+      };
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.isLast = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: AppColors.secondary),
+          Icon(icon, size: 17, color: AppColors.secondary),
           const SizedBox(width: 10),
           SizedBox(
-            width: 90,
+            width: 84,
             child: Text(
               label,
               style: const TextStyle(
                 color: AppColors.textGray,
                 fontWeight: FontWeight.w700,
-                fontSize: 13,
+                fontSize: 12.5,
               ),
             ),
           ),
@@ -298,6 +504,7 @@ class _RequestCardState extends State<_RequestCard> {
               style: const TextStyle(
                 fontWeight: FontWeight.w700,
                 color: AppColors.dark,
+                fontSize: 13.5,
               ),
             ),
           ),
@@ -305,16 +512,18 @@ class _RequestCardState extends State<_RequestCard> {
       ),
     );
   }
+}
 
-  Widget _statusBadge(String status) {
-    final color = switch (status) {
-      'approved' => AppColors.secondary,
-      'in-transit' => AppColors.accent,
-      'completed' => AppColors.completed,
-      _ => AppColors.pending,
-    };
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.status, required this.color});
+
+  final String status;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(99),

@@ -1,18 +1,15 @@
 import 'dart:io';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import '../constants/app_colors.dart';
 import '../widgets/design_system.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String role;
-
   const ProfileScreen({
     super.key,
     this.role = 'citizen',
@@ -23,10 +20,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // The photo itself lives only on this device — in the app's local
-  // documents folder, with just the file path remembered in
-  // SharedPreferences (also local, on-device). Nothing is uploaded or
-  // written to Firestore/any backend database.
   File? _pickedPhoto;
   bool _isPickingPhoto = false;
   bool _photoLoaded = false;
@@ -52,7 +45,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (mounted) setState(() => _pickedPhoto = File(path));
       }
     } catch (_) {
-      // If loading fails, just fall back to the default avatar icon.
+      // Fallback to default avatar
     } finally {
       if (mounted) setState(() => _photoLoaded = true);
     }
@@ -81,25 +74,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  /// Copies the picked image into the app's own documents folder (so it
-  /// survives app restarts, unlike the picker's temp cache path) and
-  /// remembers the path in SharedPreferences. Uses a fresh, timestamped
-  /// filename each time and deletes the previous local copy — this avoids
-  /// both disk buildup and Flutter's FileImage caching a stale photo under
-  /// a reused path.
   Future<File> _savePhotoLocally(String sourcePath) async {
     final docsDir = await getApplicationDocumentsDirectory();
     final ext = sourcePath.split('.').last;
     final newPath =
         '${docsDir.path}/profile_photo_${_uid}_${DateTime.now().millisecondsSinceEpoch}.$ext';
-
     final prefs = await SharedPreferences.getInstance();
     final oldPath = prefs.getString(_photoPrefsKey);
     if (oldPath != null) {
       final oldFile = File(oldPath);
       if (await oldFile.exists()) await oldFile.delete();
     }
-
     final newFile = await File(sourcePath).copy(newPath);
     await prefs.setString(_photoPrefsKey, newPath);
     return newFile;
@@ -160,7 +145,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final uid = _uid;
-
     if (uid.isEmpty) {
       return RescueGradientScaffold(
         child: const Center(
@@ -179,8 +163,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (snapshot.connectionState == ConnectionState.waiting || !_photoLoaded) {
             return const Center(child: CircularProgressIndicator());
           }
-
           final data = snapshot.data ?? {};
+
+          // --- Kunin ang mga datos ---
           final name = (data['name'] ?? data['fullname'] ?? data['responder_name'] ?? 'Profile').toString();
           final email = (data['email'] ?? '-').toString();
           final contact = (data['contactNumber'] ?? '-').toString();
@@ -194,69 +179,79 @@ class _ProfileScreenState extends State<ProfileScreen> {
           return ListView(
             padding: const EdgeInsets.all(20),
             children: [
+              // === HEADER CARD ===
               _headerCard(context, name, roleLabel, isVerified),
-              const SizedBox(height: 18),
+              const SizedBox(height: 20),
+
+              // === GROUP 1: PERSONAL INFORMATION ===
+              _groupTitle(Icons.person_outline, 'Personal Information'),
               GlassCard(
                 padding: const EdgeInsets.all(18),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Profile Details',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.dark,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
                     _detailRow('Full Name', name),
-                    _detailRow('Email', email),
+                    _detailRow('Email Address', email),
                     _detailRow('Mobile Number', contact),
-                    _detailRow('Role', roleLabel),
-                    if (widget.role == 'citizen') ...[
-                      _detailRow('Barangay', barangay),
-                      _detailRow('Municipality', municipality),
-                      _detailRow('Province', province),
-                    ],
-                    _detailRow('Status', accountStatus.toUpperCase()),
+                    _detailRow('Account Role', roleLabel),
                   ],
                 ),
               ),
               const SizedBox(height: 18),
+
+              // === GROUP 2: LOCATION DETAILS (KUNG CITIZEN LANG) ===
+              if (widget.role == 'citizen') ...[
+                _groupTitle(Icons.location_on_outlined, 'Location Details'),
+                GlassCard(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    children: [
+                      _detailRow('Barangay', barangay),
+                      _detailRow('Municipality / City', municipality),
+                      _detailRow('Province', province),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+              ],
+
+              // === GROUP 3: ACCOUNT STATUS ===
+              _groupTitle(Icons.info_outline, 'Account Status'),
               GlassCard(
                 padding: const EdgeInsets.all(18),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Account Status',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.dark,
-                      ),
-                    ),
+                    _detailRow('Current Status', accountStatus.toUpperCase()),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Icon(
-                          isVerified ? Icons.verified_user_rounded : Icons.pending_actions_rounded,
-                          color: isVerified ? AppColors.completed : AppColors.warning,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            isVerified
-                              ? 'Your account is active and ready for assistance.'
-                              : 'Your account is still under review for verification.',
-                            style: const TextStyle(
-                              color: AppColors.textGray,
-                              height: 1.5,
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isVerified
+                            ? AppColors.completed.withValues(alpha: 0.08)
+                            : AppColors.warning.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isVerified ? Icons.verified_user_rounded : Icons.pending_actions_rounded,
+                            color: isVerified ? AppColors.completed : AppColors.warning,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              isVerified
+                                  ? '✅ Your account is verified and fully active.'
+                                  : '⏳ Your account is still under review.',
+                              style: TextStyle(
+                                color: isVerified ? AppColors.completed : AppColors.warning,
+                                fontWeight: FontWeight.w600,
+                                height: 1.4,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -268,17 +263,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // --- WIDGET: PAMAGAT NG BAWAT GRUPO ---
+  Widget _groupTitle(IconData icon, String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10, left: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.primary),
+          const SizedBox(width: 6),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+              color: AppColors.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<Map<String, dynamic>> _loadProfileData(String uid, String role) async {
     final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
     final userData = userDoc.data() ?? {};
-
     if (role == 'citizen') {
       final citizenSnap = await FirebaseFirestore.instance
           .collection('citizens')
           .where('userID', isEqualTo: uid)
           .limit(1)
           .get();
-
       if (citizenSnap.docs.isNotEmpty) {
         return {...userData, ...citizenSnap.docs.first.data()};
       }
@@ -288,12 +302,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           .where('userID', isEqualTo: uid)
           .limit(1)
           .get();
-
       if (responderSnap.docs.isNotEmpty) {
         return {...userData, ...responderSnap.docs.first.data()};
       }
     }
-
     return userData;
   }
 
@@ -365,11 +377,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// Avatar with a small edit badge. Tapping it opens the gallery/camera
-  /// picker; the photo is copied into local app storage and remembered
-  /// via SharedPreferences (see `_savePhotoLocally`), so it now survives
-  /// navigating away or restarting the app — still device-only, never
-  /// sent to a database.
   Widget _avatar(String roleLabel) {
     return GestureDetector(
       onTap: _isPickingPhoto ? null : _showPhotoSourceSheet,
@@ -391,7 +398,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   )
                 : (_pickedPhoto == null
                     ? Icon(
-                        roleLabel == 'Responder' ? Icons.medical_services_rounded : Icons.person_rounded,
+                        roleLabel == 'Responder'
+                            ? Icons.medical_services_rounded
+                            : Icons.person_rounded,
                         size: 28,
                         color: Colors.white,
                       )
@@ -421,7 +430,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _detailRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
