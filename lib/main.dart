@@ -25,12 +25,13 @@ Future<void> main() async {
 
   try {
     if (Firebase.apps.isEmpty) {
-      // ✅ KUSANG HAHANAPIN ANG GoogleService-Info.plist sa iOS
       await Firebase.initializeApp();
     }
 
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-    await NotificationService().initialize();
+    if (Firebase.apps.isNotEmpty) {
+      await NotificationService().initialize();
+    }
   } catch (error, stackTrace) {
     debugPrint('Startup services failed: $error');
     debugPrintStack(stackTrace: stackTrace);

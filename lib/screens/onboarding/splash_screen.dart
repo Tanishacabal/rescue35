@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import '../../constants/app_colors.dart';
@@ -36,22 +37,26 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     Widget nextScreen = const OnboardingScreen();
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        String role = 'citizen';
-        try {
-          role = await AuthService().getUserRole();
-        } catch (_) {
-          role = 'citizen';
-        }
 
-        if (role == 'admin') {
-          await AuthService().logout();
-        } else {
-          nextScreen = role == 'responder'
-              ? const ResponderDashboard()
-              : const CitizenDashboard();
+    try {
+      final firebaseReady = Firebase.apps.isNotEmpty;
+      if (firebaseReady) {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          String role = 'citizen';
+          try {
+            role = await AuthService().getUserRole();
+          } catch (_) {
+            role = 'citizen';
+          }
+
+          if (role == 'admin') {
+            await AuthService().logout();
+          } else {
+            nextScreen = role == 'responder'
+                ? const ResponderDashboard()
+                : const CitizenDashboard();
+          }
         }
       }
     } catch (_) {
