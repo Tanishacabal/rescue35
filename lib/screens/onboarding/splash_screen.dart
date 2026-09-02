@@ -39,7 +39,13 @@ class _SplashScreenState extends State<SplashScreen>
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        final role = await AuthService().getUserRole();
+        String role = 'citizen';
+        try {
+          role = await AuthService().getUserRole();
+        } catch (_) {
+          role = 'citizen';
+        }
+
         if (role == 'admin') {
           await AuthService().logout();
         } else {

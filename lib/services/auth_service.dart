@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -41,7 +42,7 @@ class AuthService {
         await _auth.signOut();
         return 'This account is disabled.';
       }
-      await NotificationService().saveTokenAfterLogin();
+      unawaited(NotificationService().saveTokenAfterLogin());
       return null; // null = walang error
     } on FirebaseAuthException catch (e) {
       if (e.code == 'user-not-found') {
@@ -191,8 +192,18 @@ class AuthService {
   // ── Kumuha ng role ng current user ───────────────────────
   Future<String> getUserRole() async {
     final uid = _auth.currentUser!.uid;
-    final doc = await _db.collection('users').doc(uid).get();
-    return doc['role'] ?? 'citizen';
+    final doc = await _db
+        .collection('users')
+        .doc(uid)
+        .get()
+        .timeout(
+          const Duration(seconds: 8),
+          onTimeout: () => throw TimeoutException(
+            'Timed out while loading the user role.',
+            const Duration(seconds: 8),
+          ),
+        );
+    return doc.data()?['role'] ?? 'citizen';
   }
 
   // ── Logout ───────────────────────────────────────────────
