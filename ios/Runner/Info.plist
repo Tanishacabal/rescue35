@@ -24,43 +24,8 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>PASTE_YOUR_REVERSED_CLIENT_ID_HERE</string>
-			</array>
-		</dict>
-	</array>
-	<key>FirebaseAppDelegateProxyEnabled</key>
-	<false/>
-	<key>LSApplicationQueriesSchemes</key>
-	<array>
-		<string>tel</string>
-		<string>telprompt</string>
-	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSCameraUsageDescription</key>
-	<string>This app needs camera access to upload incident photos and document evidence.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>This app needs your location even in the background to provide accurate rescue dispatch and live pickup tracking.</string>
-	<key>NSLocationAlwaysUsageDescription</key>
-	<string>This app needs your location in the background to provide accurate rescue dispatch and live pickup tracking.</string>
-	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
-	<dict>
-		<key>Location</key>
-		<string>This app needs your location to find pickup points and send rescue teams accurately.</string>
-	</dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app needs your location to find nearby requests and show pickup locations.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>This app needs access to your photo library to attach images to a request.</string>
-	<key>NSUserTrackingUsageDescription</key>
-	<string>This app uses device tracking to provide relevant emergency notifications and improve dispatch service delivery.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -88,11 +53,6 @@
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>fetch</string>
-		<string>remote-notification</string>
-	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
