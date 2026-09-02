@@ -1,11 +1,9 @@
 import 'dart:async';
 import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'firebase_options.dart';
 import 'constants/app_colors.dart';
 import 'screens/onboarding/splash_screen.dart';
 import 'services/notification_service.dart';
@@ -27,10 +25,10 @@ Future<void> main() async {
 
   try {
     if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
+      // ✅ KUSANG HAHANAPIN ANG GoogleService-Info.plist sa iOS
+      await Firebase.initializeApp();
     }
+
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     await NotificationService().initialize();
   } catch (error, stackTrace) {
@@ -49,7 +47,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Rescue 35',
       debugShowCheckedModeBanner: false,
-      navigatorKey: navigatorKey, // ← ito lang ang idinagdag
+      navigatorKey: navigatorKey,
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: AppColors.background,
