@@ -9,23 +9,32 @@ jobs:
   build-ipa:
     runs-on: macos-latest
     steps:
-      - name: 📥 I-download ang code
+      - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: 🔧 I-setup ang Flutter
+      - name: 🔧 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.x'
           channel: 'stable'
 
-      - name: 📦 I-install ang dependencies
+      - name: 📦 Install dependencies
         run: flutter pub get
 
-      - name: 🔨 I-build ang iOS app
+      - name: 🔨 Build iOS IPA
         run: flutter build ipa --release --no-codesign
 
-      - name: ✅ I-upload ang IPA file
+      - name: 🔍 Hanapin kung NASAAAN ang IPA
+        run: |
+          echo "=== List ng build folder ==="
+          ls -la build/
+          echo "=== List ng build/ios ==="
+          ls -la build/ios/
+          echo "=== List ng build/ios/ipa ==="
+          ls -la build/ios/ipa/ || echo "WALA SA IPA FOLDER!"
+
+      - name: 📤 Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: Rescue35-iOS-Build
-          path: build/ios/ipa/*.ipa
+          path: build/ios/
