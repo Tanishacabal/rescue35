@@ -3,19 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
 import 'constants/app_colors.dart';
 import 'screens/onboarding/splash_screen.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'services/notification_service.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MyApp());
-  unawaited(_initializeServices());
-}
 
-Future<void> _initializeServices() async {
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -26,6 +22,8 @@ Future<void> _initializeServices() async {
     debugPrint('Startup services failed: $error');
     debugPrintStack(stackTrace: stackTrace);
   }
+
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -46,6 +44,7 @@ class MyApp extends StatelessWidget {
           primary: AppColors.primary,
           secondary: AppColors.secondary,
           surface: AppColors.surface,
+          error: AppColors.rejected,
           brightness: Brightness.light,
         ),
         textTheme: GoogleFonts.interTextTheme().copyWith(
@@ -117,6 +116,12 @@ class MyApp extends StatelessWidget {
           elevation: 0,
           color: Colors.white,
           margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+        ),
+        dialogTheme: DialogThemeData(
+          backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),

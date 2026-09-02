@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -18,6 +20,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
+  Timer? _splashTimer;
 
   @override
   void initState() {
@@ -26,7 +29,7 @@ class _SplashScreenState extends State<SplashScreen>
       vsync: this,
       duration: const Duration(milliseconds: 3400),
     )..forward();
-    Future.delayed(const Duration(milliseconds: 3600), _routeAfterSplash);
+    _splashTimer = Timer(const Duration(milliseconds: 3600), _routeAfterSplash);
   }
 
   Future<void> _routeAfterSplash() async {
@@ -130,6 +133,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
+    _splashTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }

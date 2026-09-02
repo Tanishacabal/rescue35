@@ -21,7 +21,6 @@ class _ResponderDashboardState extends State<ResponderDashboard>
     with SingleTickerProviderStateMixin {
   static const _nativeActions = MethodChannel('rescue35/native_actions');
   late final AnimationController _pulseController;
-
   int _selectedIndex = 0;
 
   static const _navItems = [
@@ -86,21 +85,22 @@ class _ResponderDashboardState extends State<ResponderDashboard>
   }
 
   // =====================================================
-  // LAHAT NG FUNCTIONS NASA LOOB — WALANG ERROR!
+  // ALL FUNCTIONS
   // =====================================================
-
   Future<_DispatchDetails> _loadDispatchDetails(
     Map<String, dynamic> scheduleData,
   ) async {
     final requestID = scheduleData['requestID']?.toString();
     Map<String, dynamic> requestData = {};
     Map<String, dynamic> patientData = {};
+
     if (requestID != null && requestID.isNotEmpty) {
       final requestDoc = await FirebaseFirestore.instance
           .collection('transport_requests')
           .doc(requestID)
           .get();
       requestData = requestDoc.data() ?? {};
+
       final patientID = requestData['patientID']?.toString();
       if (patientID != null && patientID.isNotEmpty) {
         final patientDoc = await FirebaseFirestore.instance
@@ -110,6 +110,7 @@ class _ResponderDashboardState extends State<ResponderDashboard>
         patientData = patientDoc.data() ?? {};
       }
     }
+
     return _DispatchDetails(
       requestData: requestData,
       location: requestData['location'] ?? scheduleData['pickUpLocation'] ?? '-',
@@ -197,25 +198,13 @@ class _ResponderDashboardState extends State<ResponderDashboard>
                         : () => _openMap(details.location),
                   ),
                   const SizedBox(height: 18),
+                  // ✅ WALANG ACCEPT BUTTON — PCR BUTTON NA LANG
                   Row(
                     children: [
-                      if (scheduleData['status'] != 'in-transit') ...[
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.check_circle_outline),
-                            label: const Text('Accept Dispatch'),
-                            onPressed: () {
-                              Navigator.pop(context);
-                              _acceptDispatch(context, doc);
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                      ],
                       Expanded(
                         child: FilledButton.icon(
                           icon: const Icon(Icons.document_scanner_outlined),
-                          label: const Text('Scan PCR'),
+                          label: const Text('Open PCR Form'),
                           onPressed: () {
                             Navigator.pop(context);
                             _openPcr(context, doc, details);
@@ -320,28 +309,32 @@ class _ResponderDashboardState extends State<ResponderDashboard>
     final scheduleData = doc.data() as Map<String, dynamic>;
     final requestID = scheduleData['requestID']?.toString();
     String? patientName = scheduleData['patientName']?.toString();
+
     if ((patientName == null || patientName.isEmpty) &&
         requestID != null &&
         requestID.isNotEmpty) {
       final details = await _loadDispatchDetails(scheduleData);
       patientName = details.patientName;
     }
+
     final batch = FirebaseFirestore.instance.batch();
     batch.update(doc.reference, {
       'status': 'in-transit',
       if (patientName != null && patientName.isNotEmpty)
         'patientName': patientName,
     });
+
     if (requestID != null && requestID.isNotEmpty) {
       batch.update(
         FirebaseFirestore.instance.collection('transport_requests').doc(requestID),
         {'status': 'in-transit'},
       );
     }
+
     await batch.commit();
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Dispatch accepted.')),
+      const SnackBar(content: Text('En Route — Dispatch accepted.')),
     );
   }
 
@@ -387,38 +380,6 @@ class _ResponderDashboardState extends State<ResponderDashboard>
     );
   }
 
-  int _sortSchedules(QueryDocumentSnapshot a, QueryDocumentSnapshot b) {
-    final aData = a.data() as Map<String, dynamic>;
-    final bData = b.data() as Map<String, dynamic>;
-    final aDate = _scheduleMillis(aData);
-    final bDate = _scheduleMillis(bData);
-    return aDate.compareTo(bDate);
-  }
-
-  int _scheduleMillis(Map<String, dynamic> data) {
-    final value = data['scheduleDate'];
-    if (value is Timestamp) return value.millisecondsSinceEpoch;
-    if (value is DateTime) return value.millisecondsSinceEpoch;
-    if (value is String) return DateTime.tryParse(value)?.millisecondsSinceEpoch ?? 0;
-    return 0;
-  }
-
-  bool _isToday(Map<String, dynamic> data) {
-    final value = data['scheduleDate'];
-    DateTime? scheduleDate;
-    if (value is Timestamp) {
-      scheduleDate = value.toDate();
-    } else if (value is DateTime) {
-      scheduleDate = value;
-    } else if (value is String) {
-      scheduleDate = DateTime.tryParse(value);
-    }
-    if (scheduleDate == null) return false;
-    final now = DateTime.now();
-    return scheduleDate.year == now.year &&
-        scheduleDate.month == now.month &&
-        scheduleDate.day == now.day;
-  }
 }
 
 // =====================================================
@@ -456,11 +417,21 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ "En Route" at "Assigned" na ang display text
+    final displayText = switch (status) {
+      'in-transit' => 'En Route',
+      'approved' => 'Assigned',
+      'pending' => 'Pending',
+      'completed' => 'Completed',
+      _ => status,
+    };
+
     final color = switch (status) {
       'in-transit' => AppColors.accent,
       'completed' => AppColors.completed,
       _ => AppColors.secondary,
     };
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -468,7 +439,7 @@ class _StatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
-        status,
+        displayText,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
@@ -596,7 +567,7 @@ class _DispatchBody extends StatelessWidget {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('transport_schedules')
-          .where('responderID', isEqualTo: uid)
+          .where('responderIDs', arrayContains: uid)
           .snapshots(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
@@ -616,17 +587,24 @@ class _DispatchBody extends StatelessWidget {
         }
 
         final docs = [...?snap.data?.docs]..sort((a, b) {
-          final aData = a.data() as Map<String, dynamic>;
-          final bData = b.data() as Map<String, dynamic>;
-          int getMillis(d) {
-            final v = d['scheduleDate'];
-            if (v is Timestamp) return v.millisecondsSinceEpoch;
-            if (v is DateTime) return v.millisecondsSinceEpoch;
-            if (v is String) return DateTime.tryParse(v)?.millisecondsSinceEpoch ?? 0;
-            return 0;
-          }
-          return getMillis(aData).compareTo(getMillis(bData));
-        });
+            final aData = a.data() as Map<String, dynamic>;
+            final bData = b.data() as Map<String, dynamic>;
+            int getMillis(d) {
+              final v = d['scheduleDate'];
+              if (v is Timestamp) {
+                return v.millisecondsSinceEpoch;
+              }
+              if (v is DateTime) {
+                return v.millisecondsSinceEpoch;
+              }
+              if (v is String) {
+                final parsed = DateTime.tryParse(v);
+                return parsed?.millisecondsSinceEpoch ?? 0;
+              }
+              return 0;
+            }
+            return getMillis(aData).compareTo(getMillis(bData));
+          });
 
         final assigned = docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
@@ -636,9 +614,13 @@ class _DispatchBody extends StatelessWidget {
         bool isToday(Map<String, dynamic> data) {
           final value = data['scheduleDate'];
           DateTime? sd;
-          if (value is Timestamp) sd = value.toDate();
-          else if (value is DateTime) sd = value;
-          else if (value is String) sd = DateTime.tryParse(value);
+          if (value is Timestamp) {
+            sd = value.toDate();
+          } else if (value is DateTime) {
+            sd = value;
+          } else if (value is String) {
+            sd = DateTime.tryParse(value);
+          }
           if (sd == null) return false;
           final now = DateTime.now();
           return sd.year == now.year && sd.month == now.month && sd.day == now.day;
@@ -679,7 +661,16 @@ class _DispatchBody extends StatelessWidget {
                     color: AppColors.primary,
                     onTap: assigned.isEmpty
                         ? null
-                        : () => showDispatchDetails(context, assigned.first),
+                        : () async {
+                            final first = assigned.first;
+                            final data = first.data() as Map<String, dynamic>;
+                            if (data['status'] != 'in-transit') {
+                              await acceptDispatch(context, first);
+                            }
+                            if (context.mounted) {
+                              await showDispatchDetails(context, first);
+                            }
+                          },
                   ),
                   _DashboardCard(
                     label: 'Emergency PCR',
@@ -724,10 +715,10 @@ class _DispatchBody extends StatelessWidget {
               )
             else
               ...todaySchedules.map((doc) => _DispatchCard(
-                doc: doc,
-                showDispatchDetails: showDispatchDetails,
-                acceptDispatch: acceptDispatch,
-              )),
+                    doc: doc,
+                    showDispatchDetails: showDispatchDetails,
+                    acceptDispatch: acceptDispatch,
+                  )),
             const SizedBox(height: 24),
             const Row(
               children: [
@@ -747,10 +738,10 @@ class _DispatchBody extends StatelessWidget {
               )
             else
               ...otherSchedules.map((doc) => _DispatchCard(
-                doc: doc,
-                showDispatchDetails: showDispatchDetails,
-                acceptDispatch: acceptDispatch,
-              )),
+                    doc: doc,
+                    showDispatchDetails: showDispatchDetails,
+                    acceptDispatch: acceptDispatch,
+                  )),
           ],
         );
       },
@@ -820,11 +811,21 @@ class _LivePulse extends StatelessWidget {
         final scale = 1 + (controller.value * 0.85);
         final opacity = 1 - controller.value;
         return SizedBox(
-          width: 24, height: 24,
-          child: Stack(alignment: Alignment.center, children: [
-            Transform.scale(scale: scale, child: Opacity(opacity: opacity, child: Container(width: 14, height: 14, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.26), shape: BoxShape.circle)))),
-            Container(width: 10, height: 10, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
-          ]),
+          width: 24,
+          height: 24,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Transform.scale(
+                scale: scale,
+                child: Opacity(
+                  opacity: opacity,
+                  child: Container(width: 14, height: 14, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.26), shape: BoxShape.circle)),
+                ),
+              ),
+              Container(width: 10, height: 10, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
+            ],
+          ),
         );
       },
     );
@@ -832,7 +833,11 @@ class _LivePulse extends StatelessWidget {
 }
 
 class _DispatchCard extends StatelessWidget {
-  const _DispatchCard({required this.doc, required this.showDispatchDetails, required this.acceptDispatch});
+  const _DispatchCard({
+    required this.doc,
+    required this.showDispatchDetails,
+    required this.acceptDispatch,
+  });
   final QueryDocumentSnapshot doc;
   final Future<void> Function(BuildContext, QueryDocumentSnapshot) showDispatchDetails;
   final Future<void> Function(BuildContext, QueryDocumentSnapshot) acceptDispatch;
@@ -841,35 +846,76 @@ class _DispatchCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final data = doc.data() as Map<String, dynamic>;
     return GlassCard(
-      radius: 12, margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(14),
+      radius: 12,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
-        onTap: () => showDispatchDetails(context, doc),
+        // ✅ PAG PININDOT → AUTOMATIC NA EN ROUTE AGAD!
+        onTap: () async {
+          if (data['status'] != 'in-transit') {
+            await acceptDispatch(context, doc);
+          }
+          if (context.mounted) {
+            await showDispatchDetails(context, doc);
+          }
+        },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(data['patientName'] ?? 'Patient', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.dark)),
-                  const SizedBox(height: 2),
-                  Text(data['trackingNumber'] ?? data['requestID'] ?? doc.id, style: const TextStyle(fontSize: 12, color: AppColors.textGray, fontWeight: FontWeight.w700)),
-                ])),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        data['patientName'] ?? 'Patient',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.dark),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        data['trackingNumber'] ?? data['requestID'] ?? doc.id,
+                        style: const TextStyle(fontSize: 12, color: AppColors.textGray, fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(width: 8),
                 _StatusBadge(status: data['status'] ?? 'approved'),
               ],
             ),
             const SizedBox(height: 8),
-            Row(children: [const Icon(Icons.location_on_outlined, size: 16, color: AppColors.secondary), const SizedBox(width: 6), Expanded(child: Text(data['pickUpLocation'] ?? '-', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)))]),
-            const SizedBox(height: 12),
-            Row(children: [
-              if (data['status'] != 'in-transit') ...[
-                Expanded(child: OutlinedButton.icon(icon: const Icon(Icons.check_circle_outline, size: 18), label: const Text('Accept'), onPressed: () => acceptDispatch(context, doc))),
-                const SizedBox(width: 10),
+            Row(
+              children: [
+                const Icon(Icons.location_on_outlined, size: 16, color: AppColors.secondary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    data['pickUpLocation'] ?? '-',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
               ],
-              Expanded(child: FilledButton.icon(icon: const Icon(Icons.document_scanner_outlined, size: 18), label: const Text('PCR'), onPressed: () {})),
-            ]),
+            ),
+            const SizedBox(height: 12),
+            // ✅ WALANG ACCEPT BUTTON — PCR BUTTON NA LANG
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    icon: const Icon(Icons.document_scanner_outlined, size: 18),
+                    label: const Text('PCR / Report'),
+                    onPressed: () {
+                      // Punan mo na ng PCR action kung kailangan
+                    },
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -892,15 +938,34 @@ class _PcrTab extends StatelessWidget {
       children: [
         const SizedBox(height: 30),
         Center(
-          child: Column(children: [
-            Container(width: 120, height: 120, decoration: BoxDecoration(color: AppColors.secondary.withValues(alpha: 0.12), shape: BoxShape.circle), child: const Icon(Icons.document_scanner_rounded, color: AppColors.secondary, size: 56)),
-            const SizedBox(height: 24),
-            const Text('Patient Care Report', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.dark)),
-            const SizedBox(height: 8),
-            const Text('Start an emergency PCR or select from dispatch', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textGray, fontSize: 13)),
-            const SizedBox(height: 32),
-            SizedBox(width: double.infinity, child: FilledButton.icon(style: FilledButton.styleFrom(backgroundColor: AppColors.secondary, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), icon: const Icon(Icons.add_circle_outline_rounded, size: 20), label: const Text('Start Emergency PCR', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)), onPressed: () => openEmergencyPcr(context))),
-          ]),
+          child: Column(
+            children: [
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(color: AppColors.secondary.withValues(alpha: 0.12), shape: BoxShape.circle),
+                child: const Icon(Icons.document_scanner_rounded, color: AppColors.secondary, size: 56),
+              ),
+              const SizedBox(height: 24),
+              const Text('Patient Care Report', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.dark)),
+              const SizedBox(height: 8),
+              const Text('Start an emergency PCR or select from dispatch', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textGray, fontSize: 13)),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.secondary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
+                  label: const Text('Start Emergency PCR', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                  onPressed: () => openEmergencyPcr(context),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -921,13 +986,33 @@ class _FloatingNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Container(
-        height: 70, margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        height: 70,
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, 4))]),
-        child: Row(children: List.generate(items.length, (index) {
-          final item = items[index];
-          final selected = index == selectedIndex;
-          return Expanded(child: InkWell(onTap: () => onTap(index), borderRadius: BorderRadius.circular(16), child: Container(padding: const EdgeInsets.symmetric(vertical: 8), decoration: BoxDecoration(color: selected ? AppColors.primary.withValues(alpha: 0.12) : Colors.transparent, borderRadius: BorderRadius.circular(16)), child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(selected ? item.activeIcon : item.icon, color: selected ? AppColors.primary : AppColors.textGray, size: 24), const SizedBox(height: 2), Text(item.label, style: TextStyle(fontSize: 11, fontWeight: selected ? FontWeight.bold : FontWeight.normal, color: selected ? AppColors.primary : AppColors.textGray))]))));
-        })),
+        child: Row(
+          children: List.generate(items.length, (index) {
+            final item = items[index];
+            final selected = index == selectedIndex;
+            return Expanded(
+              child: InkWell(
+                onTap: () => onTap(index),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(color: selected ? AppColors.primary.withValues(alpha: 0.12) : Colors.transparent, borderRadius: BorderRadius.circular(16)),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(selected ? item.activeIcon : item.icon, color: selected ? AppColors.primary : AppColors.textGray, size: 24),
+                      const SizedBox(height: 2),
+                      Text(item.label, style: TextStyle(fontSize: 11, fontWeight: selected ? FontWeight.bold : FontWeight.normal, color: selected ? AppColors.primary : AppColors.textGray)),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
       ),
     );
   }

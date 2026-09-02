@@ -35,7 +35,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadSavedPhoto() async {
     if (_uid.isEmpty) {
-      setState(() => _photoLoaded = true);
+      if (mounted) setState(() => _photoLoaded = true);
       return;
     }
     try {
@@ -52,6 +52,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _pickPhoto(ImageSource source) async {
+    if (!mounted) return;
     setState(() => _isPickingPhoto = true);
     try {
       final picker = ImagePicker();
@@ -67,7 +68,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unable to open photo: $e')),
+        SnackBar(
+          content: Text('Unable to open photo: $e'),
+          backgroundColor: AppColors.warning,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     } finally {
       if (mounted) setState(() => _isPickingPhoto = false);
@@ -104,38 +109,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _showPhotoSourceSheet() {
     showModalBottomSheet<void>(
       context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       showDragHandle: true,
       builder: (context) {
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
-                title: const Text('Choose from Gallery'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickPhoto(ImageSource.gallery);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_camera_outlined, color: AppColors.primary),
-                title: const Text('Take a Photo'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickPhoto(ImageSource.camera);
-                },
-              ),
-              if (_pickedPhoto != null)
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Profile Photo',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
                 ListTile(
-                  leading: const Icon(Icons.delete_outline, color: AppColors.warning),
-                  title: const Text('Remove Photo'),
+                  leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
+                  title: const Text('Choose from Gallery'),
                   onTap: () {
                     Navigator.pop(context);
-                    _removePhoto();
+                    _pickPhoto(ImageSource.gallery);
                   },
                 ),
-            ],
+                ListTile(
+                  leading: const Icon(Icons.photo_camera_outlined, color: AppColors.primary),
+                  title: const Text('Take a Photo'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickPhoto(ImageSource.camera);
+                  },
+                ),
+                if (_pickedPhoto != null)
+                  ListTile(
+                    leading: const Icon(Icons.delete_outline, color: AppColors.warning),
+                    title: const Text('Remove Photo', style: TextStyle(color: AppColors.warning)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _removePhoto();
+                    },
+                  ),
+                const SizedBox(height: 12),
+              ],
+            ),
           ),
         );
       },
@@ -150,7 +168,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: const Center(
           child: Text(
             'No user is currently signed in.',
-            style: TextStyle(color: AppColors.textGray),
+            style: TextStyle(color: AppColors.textGray, fontSize: 16),
           ),
         ),
       );
@@ -161,11 +179,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         future: _loadProfileData(uid, widget.role),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting || !_photoLoaded) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            );
           }
           final data = snapshot.data ?? {};
 
-          // --- Kunin ang mga datos ---
           final name = (data['name'] ?? data['fullname'] ?? data['responder_name'] ?? 'Profile').toString();
           final email = (data['email'] ?? '-').toString();
           final contact = (data['contactNumber'] ?? '-').toString();
@@ -176,111 +195,122 @@ class _ProfileScreenState extends State<ProfileScreen> {
           final roleLabel = widget.role == 'responder' ? 'Responder' : 'Citizen';
           final isVerified = accountStatus != 'pending' && accountStatus != 'rejected';
 
-          return ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              // === HEADER CARD ===
-              _headerCard(context, name, roleLabel, isVerified),
-              const SizedBox(height: 20),
+          return SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // === HEADER CARD ===
+                _headerCard(context, name, roleLabel, isVerified),
+                const SizedBox(height: 28),
 
-              // === GROUP 1: PERSONAL INFORMATION ===
-              _groupTitle(Icons.person_outline, 'Personal Information'),
-              GlassCard(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  children: [
-                    _detailRow('Full Name', name),
-                    _detailRow('Email Address', email),
-                    _detailRow('Mobile Number', contact),
-                    _detailRow('Account Role', roleLabel),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 18),
-
-              // === GROUP 2: LOCATION DETAILS (KUNG CITIZEN LANG) ===
-              if (widget.role == 'citizen') ...[
-                _groupTitle(Icons.location_on_outlined, 'Location Details'),
+                // === PERSONAL INFORMATION ===
+                _groupTitle(Icons.person_outline, 'Personal Information'),
+                const SizedBox(height: 10),
                 GlassCard(
-                  padding: const EdgeInsets.all(18),
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     children: [
-                      _detailRow('Barangay', barangay),
-                      _detailRow('Municipality / City', municipality),
-                      _detailRow('Province', province),
+                      _detailRow('Full Name', name),
+                      const SizedBox(height: 16),
+                      _detailRow('Email Address', email),
+                      const SizedBox(height: 16),
+                      _detailRow('Mobile Number', contact),
+                      const SizedBox(height: 16),
+                      _detailRow('Account Role', roleLabel),
                     ],
                   ),
                 ),
-                const SizedBox(height: 18),
-              ],
+                const SizedBox(height: 24),
 
-              // === GROUP 3: ACCOUNT STATUS ===
-              _groupTitle(Icons.info_outline, 'Account Status'),
-              GlassCard(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _detailRow('Current Status', accountStatus.toUpperCase()),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isVerified
-                            ? AppColors.completed.withValues(alpha: 0.08)
-                            : AppColors.warning.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            isVerified ? Icons.verified_user_rounded : Icons.pending_actions_rounded,
-                            color: isVerified ? AppColors.completed : AppColors.warning,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
+                // === LOCATION DETAILS (CITIZEN ONLY) ===
+                if (widget.role == 'citizen') ...[
+                  _groupTitle(Icons.location_on_outlined, 'Location Details'),
+                  const SizedBox(height: 10),
+                  GlassCard(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        _detailRow('Barangay', barangay),
+                        const SizedBox(height: 16),
+                        _detailRow('Municipality / City', municipality),
+                        const SizedBox(height: 16),
+                        _detailRow('Province', province),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
+                // === ACCOUNT STATUS ===
+                _groupTitle(Icons.info_outline, 'Account Status'),
+                const SizedBox(height: 10),
+                GlassCard(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _detailRow('Current Status', accountStatus.toUpperCase()),
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isVerified
+                              ? AppColors.completed.withValues(alpha: 0.10)
+                              : AppColors.warning.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
                               isVerified
-                                  ? '✅ Your account is verified and fully active.'
-                                  : '⏳ Your account is still under review.',
-                              style: TextStyle(
-                                color: isVerified ? AppColors.completed : AppColors.warning,
-                                fontWeight: FontWeight.w600,
-                                height: 1.4,
+                                  ? Icons.verified_user_rounded
+                                  : Icons.pending_actions_rounded,
+                              color: isVerified ? AppColors.completed : AppColors.warning,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                isVerified
+                                    ? '✅ Your account is verified and fully active.'
+                                    : '⏳ Your account is still under review.',
+                                style: TextStyle(
+                                  color: isVerified ? AppColors.completed : AppColors.warning,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.5,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           );
         },
       ),
     );
   }
 
-  // --- WIDGET: PAMAGAT NG BAWAT GRUPO ---
   Widget _groupTitle(IconData icon, String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10, left: 4),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: AppColors.primary),
-          const SizedBox(width: 6),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
-              color: AppColors.primary,
-            ),
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: AppColors.primary),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppColors.primary,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -312,14 +342,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _headerCard(BuildContext context, String name, String roleLabel, bool isVerified) {
     return GlassCard(
       color: AppColors.primary,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(22),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               _avatar(roleLabel),
-              const SizedBox(width: 14),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -329,22 +358,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 22,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(99),
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         roleLabel,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -353,24 +382,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               IconButton(
                 onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close_rounded, color: Colors.white),
-                tooltip: 'Back',
+                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              const Icon(Icons.shield_outlined, color: Colors.white70, size: 18),
-              const SizedBox(width: 8),
-              Text(
-                isVerified ? 'Account verified' : 'Verification in progress',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontWeight: FontWeight.w700,
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.shield_outlined, color: Colors.white70, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  isVerified ? 'Account verified' : 'Verification in progress',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -384,15 +423,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         clipBehavior: Clip.none,
         children: [
           CircleAvatar(
-            radius: 28,
+            radius: 32,
             backgroundColor: Colors.white.withValues(alpha: 0.2),
             backgroundImage: _pickedPhoto != null ? FileImage(_pickedPhoto!) : null,
             child: _isPickingPhoto
                 ? const SizedBox(
-                    width: 20,
-                    height: 20,
+                    width: 22,
+                    height: 22,
                     child: CircularProgressIndicator(
-                      strokeWidth: 2,
+                      strokeWidth: 2.5,
                       color: Colors.white,
                     ),
                   )
@@ -410,7 +449,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             bottom: -2,
             right: -2,
             child: Container(
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(5),
               decoration: BoxDecoration(
                 color: Colors.white,
                 shape: BoxShape.circle,
@@ -418,7 +457,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               child: const Icon(
                 Icons.camera_alt_rounded,
-                size: 12,
+                size: 14,
                 color: AppColors.primary,
               ),
             ),
@@ -429,29 +468,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _detailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.textGray,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.textGray,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
           ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              color: AppColors.dark,
-              fontWeight: FontWeight.w800,
-            ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            color: AppColors.dark,
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
