@@ -1,95 +1,127 @@
 import Flutter
 import UIKit
-import FirebaseCore
-import FirebaseAuth
-import FirebaseMessaging
-import UserNotifications
 
-@main
-@objc class AppDelegate: FlutterAppDelegate, MessagingDelegate {
-  override func application(
-    _ application: UIApplication,
-    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
-  ) -> Bool {
-    FirebaseApp.configure()
+class SceneDelegate: FlutterSceneDelegate {
 
-    if #available(iOS 10.0, *) {
-      UNUserNotificationCenter.current().delegate = self
-      let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
-      UNUserNotificationCenter.current().requestAuthorization(
-        options: authOptions,
-        completionHandler: { _, _ in }
-      )
+  override func scene(
+    _ scene: UIScene,
+    willConnectTo session: UISceneSession,
+    options connectionOptions: UIScene.ConnectionOptions
+  ) {
+    super.scene(scene, willConnectTo: session, options: connectionOptions)
+
+    guard let controller = window?.rootViewController as? FlutterViewController else {
+      return
     }
 
-    application.registerForRemoteNotifications()
-    Messaging.messaging().delegate = self
+    let nativeActionsChannel = FlutterMethodChannel(
+      name: "rescue35/native_actions",
+      binaryMessenger: controller.binaryMessenger
+    )
 
-    GeneratedPluginRegistrant.register(with: self)
-
-    // Register the same 'rescue35/native_actions' MethodChannel used on
-    // Android so calls like _callNumber() from Dart actually work on iOS
-    // instead of throwing a MissingPluginException.
-    if let controller = window?.rootViewController as? FlutterViewController {
-      let nativeActionsChannel = FlutterMethodChannel(
-        name: "rescue35/native_actions",
-        binaryMessenger: controller.binaryMessenger
-      )
-
-      nativeActionsChannel.setMethodCallHandler { call, result in
-        switch call.method {
-        case "dial":
-          guard
-            let args = call.arguments as? [String: Any],
-            let number = args["number"] as? String,
-            !number.isEmpty
-          else {
-            result(FlutterError(
-              code: "INVALID_ARGUMENT",
-              message: "Missing or empty 'number'",
-              details: nil
-            ))
-            return
-          }
-
-          let sanitized = number.trimmingCharacters(in: .whitespacesAndNewlines)
-          guard let url = URL(string: "tel://\(sanitized)") else {
-            result(FlutterError(
-              code: "BAD_URL",
-              message: "Could not build tel: URL from '\(number)'",
-              details: nil
-            ))
-            return
-          }
-
-          if UIApplication.shared.canOpenURL(url) {
-            UIApplication.shared.open(url, options: [:]) { success in
-              result(success)
-            }
-          } else {
-            result(FlutterError(
-              code: "CANNOT_DIAL",
-              message: "Device cannot open tel: URLs (e.g. iPad without cellular)",
-              details: nil
-            ))
-          }
-        default:
-          result(FlutterMethodNotImplemented)
+    nativeActionsChannel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "dial":
+        guard
+          let args = call.arguments as? [String: Any],
+          let number = args["number"] as? String,
+          !number.isEmpty
+        else {
+          result(FlutterError(
+            code: "INVALID_ARGUMENT",
+            message: "Missing or empty 'number'",
+            details: nil
+          ))
+          return
         }
+
+        let sanitized = number.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: "tel://\(sanitized)") else {
+          result(FlutterError(
+            code: "BAD_URL",
+            message: "Could not build tel: URL from '\(number)'",
+            details: nil
+          ))
+          return
+        }
+
+        if UIApplication.shared.canOpenURL(url) {
+          UIApplication.shared.open(url, options: [:]) { success in
+            result(success)
+          }
+        } else {
+          result(FlutterError(
+            code: "CANNOT_DIAL",
+            message: "Device cannot open tel: URLs (e.g. iPad without cellular)",
+            details: nil
+          ))
+        }
+      default:
+        result(FlutterMethodNotImplemented)
       }
     }
-
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
+}import Flutter
+import UIKit
 
-  override func application(
-    _ app: UIApplication,
-    open url: URL,
-    options: [UIApplication.OpenURLOptionsKey: Any] = [:]
-  ) -> Bool {
-    if Auth.auth().canHandle(url) {
-      return true
+class SceneDelegate: FlutterSceneDelegate {
+
+  override func scene(
+    _ scene: UIScene,
+    willConnectTo session: UISceneSession,
+    options connectionOptions: UIScene.ConnectionOptions
+  ) {
+    super.scene(scene, willConnectTo: session, options: connectionOptions)
+
+    guard let controller = window?.rootViewController as? FlutterViewController else {
+      return
     }
-    return super.application(app, open: url, options: options)
+
+    let nativeActionsChannel = FlutterMethodChannel(
+      name: "rescue35/native_actions",
+      binaryMessenger: controller.binaryMessenger
+    )
+
+    nativeActionsChannel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "dial":
+        guard
+          let args = call.arguments as? [String: Any],
+          let number = args["number"] as? String,
+          !number.isEmpty
+        else {
+          result(FlutterError(
+            code: "INVALID_ARGUMENT",
+            message: "Missing or empty 'number'",
+            details: nil
+          ))
+          return
+        }
+
+        let sanitized = number.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: "tel://\(sanitized)") else {
+          result(FlutterError(
+            code: "BAD_URL",
+            message: "Could not build tel: URL from '\(number)'",
+            details: nil
+          ))
+          return
+        }
+
+        if UIApplication.shared.canOpenURL(url) {
+          UIApplication.shared.open(url, options: [:]) { success in
+            result(success)
+          }
+        } else {
+          result(FlutterError(
+            code: "CANNOT_DIAL",
+            message: "Device cannot open tel: URLs (e.g. iPad without cellular)",
+            details: nil
+          ))
+        }
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
   }
 }
