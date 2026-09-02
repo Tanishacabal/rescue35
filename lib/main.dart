@@ -1,42 +1,11 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'constants/app_colors.dart';
 import 'screens/onboarding/splash_screen.dart';
-import 'services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  FlutterError.onError = (details) {
-    FlutterError.presentError(details);
-    debugPrint('FlutterError: ${details.exception}');
-    debugPrintStack(stackTrace: details.stack);
-  };
-
-  PlatformDispatcher.instance.onError = (error, stack) {
-    debugPrint('PlatformDispatcher error: $error');
-    debugPrintStack(stackTrace: stack);
-    return true;
-  };
-
-  try {
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp();
-    }
-
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-    if (Firebase.apps.isNotEmpty) {
-      await NotificationService().initialize();
-    }
-  } catch (error, stackTrace) {
-    debugPrint('Startup services failed: $error');
-    debugPrintStack(stackTrace: stackTrace);
-  }
-
   runApp(const MyApp());
 }
 
@@ -48,7 +17,6 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Rescue 35',
       debugShowCheckedModeBanner: false,
-      navigatorKey: navigatorKey,
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: AppColors.background,

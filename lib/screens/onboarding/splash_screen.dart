@@ -1,14 +1,9 @@
 import 'dart:async';
 
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import '../../constants/app_colors.dart';
-import '../../services/auth_service.dart';
 import '../../widgets/design_system.dart';
-import '../citizen/citizen_dashboard.dart';
-import '../responder/responder_dashboard.dart';
 import 'onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -36,37 +31,9 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _routeAfterSplash() async {
     if (!mounted) return;
 
-    Widget nextScreen = const OnboardingScreen();
-
-    try {
-      final firebaseReady = Firebase.apps.isNotEmpty;
-      if (firebaseReady) {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null) {
-          String role = 'citizen';
-          try {
-            role = await AuthService().getUserRole();
-          } catch (_) {
-            role = 'citizen';
-          }
-
-          if (role == 'admin') {
-            await AuthService().logout();
-          } else {
-            nextScreen = role == 'responder'
-                ? const ResponderDashboard()
-                : const CitizenDashboard();
-          }
-        }
-      }
-    } catch (_) {
-      nextScreen = const OnboardingScreen();
-    }
-
-    if (!mounted) return;
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => nextScreen),
+      MaterialPageRoute(builder: (_) => const OnboardingScreen()),
     );
   }
 
