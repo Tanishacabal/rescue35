@@ -40,7 +40,13 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
   String? _responseSubType;
   final _otherSubTypeCtrl = TextEditingController();
 
-  final _responseTypes = const ['Emergency', 'Trauma', 'Medical', 'Transfer', 'OB'];
+  final _responseTypes = const [
+    'Emergency',
+    'Trauma',
+    'Medical',
+    'Transfer',
+    'OB',
+  ];
 
   final _emergencySubTypes = const [
     'Cardiac Arrest',
@@ -97,6 +103,7 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
   List<Map<String, dynamic>> _driverOptions = [];
   String? _selectedDriverID;
   bool _loadingDrivers = false;
+  bool _driverLoadFailed = false;
 
   @override
   void initState() {
@@ -106,9 +113,12 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
   }
 
   Future<void> _loadVehicleOptions() async {
+    if (!mounted) return;
     setState(() => _loadingVehicles = true);
     try {
-      final snap = await FirebaseFirestore.instance.collection('vehicles').get();
+      final snap = await FirebaseFirestore.instance
+          .collection('vehicles')
+          .get();
       final options = snap.docs
           .where((doc) => (doc.data())['status'] == 'available')
           .map((doc) {
@@ -132,27 +142,66 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
   }
 
   Future<void> _loadDriverOptions() async {
+    if (!mounted) return;
     setState(() => _loadingDrivers = true);
     try {
-      final snap = await FirebaseFirestore.instance
-          .collection('users')
-          .where('role', isEqualTo: 'driver')
-          .get();
-      final options = snap.docs.map((doc) {
-        final data = doc.data();
-        return {
-          'id': doc.id,
-          'label': (data['name'] ?? data['fullName'] ?? doc.id).toString(),
-        };
-      }).toList();
+      // Driver accounts can use different role spellings depending on where
+      // the account was created, so filter the users collection locally.
+      final snap = await FirebaseFirestore.instance.collection('users').get();
+      final options = snap.docs
+          .where((doc) {
+            final data = doc.data();
+            final role = data['role']?.toString().toLowerCase().replaceAll(
+              '-',
+              '_',
+            );
+            final userType = data['userType']
+                ?.toString()
+                .toLowerCase()
+                .replaceAll('-', '_');
+            final responderType = data['responderType']
+                ?.toString()
+                .toLowerCase()
+                .replaceAll('-', '_');
+            return {
+                  'driver',
+                  'ambulance_driver',
+                  'ambulancedriver',
+                  'driver_responder',
+                }.contains(role) ||
+                {
+                  'driver',
+                  'ambulance_driver',
+                  'ambulancedriver',
+                }.contains(userType) ||
+                {
+                  'driver',
+                  'ambulance_driver',
+                  'ambulancedriver',
+                }.contains(responderType);
+          })
+          .map((doc) {
+            final data = doc.data();
+            return {
+              'id': doc.id,
+              'label': (data['name'] ?? data['fullName'] ?? doc.id).toString(),
+            };
+          })
+          .toList();
       if (mounted) {
         setState(() {
           _driverOptions = options;
           _loadingDrivers = false;
+          _driverLoadFailed = false;
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _loadingDrivers = false);
+      if (mounted) {
+        setState(() {
+          _loadingDrivers = false;
+          _driverLoadFailed = true;
+        });
+      }
     }
   }
 
@@ -417,10 +466,12 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
           ? '$_typeOfResponse - $subTypeValue'
           : _typeOfResponse;
 
-      final driverLabel = _driverOptions.firstWhere(
-        (d) => d['id'] == _selectedDriverID,
-        orElse: () => const {'label': ''},
-      )['label'] as String;
+      final driverLabel =
+          _driverOptions.firstWhere(
+                (d) => d['id'] == _selectedDriverID,
+                orElse: () => const {'label': ''},
+              )['label']
+              as String;
 
       await db.collection('pcr_reports').add({
         'scheduleID': '',
@@ -517,7 +568,13 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
                 initialValue: _selectedDriverID,
                 isExpanded: true,
                 decoration: _dropdownDecoration(
-                  _loadingDrivers ? 'Loading drivers...' : 'Ambulance Driver',
+                  _loadingDrivers
+                      ? 'Loading drivers...'
+                      : _driverLoadFailed
+                      ? 'Unable to load drivers'
+                      : _driverOptions.isEmpty
+                      ? 'No drivers available'
+                      : 'Ambulance Driver',
                 ),
                 items: _driverOptions
                     .map(
@@ -528,8 +585,21 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
                     )
                     .toList(),
                 validator: (v) => v == null ? 'Pumili ng driver' : null,
-                onChanged: (v) => setState(() => _selectedDriverID = v),
+                onChanged: _driverOptions.isEmpty
+                    ? null
+                    : (v) => setState(() => _selectedDriverID = v),
               ),
+              if (_driverLoadFailed) ...[
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: _loadingDrivers ? null : _loadDriverOptions,
+                    icon: const Icon(Icons.refresh, size: 16),
+                    label: const Text('Retry loading drivers'),
+                  ),
+                ),
+              ],
               const SizedBox(height: 24),
 
               _sectionHeader('Response Information'),
@@ -554,11 +624,14 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
                 DropdownButtonFormField<String>(
                   initialValue: _responseSubType,
                   isExpanded: true,
-                  decoration: _dropdownDecoration('$_typeOfResponse Sub-Category'),
+                  decoration: _dropdownDecoration(
+                    '$_typeOfResponse Sub-Category',
+                  ),
                   items: _activeSubTypes
                       .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                       .toList(),
-                  validator: (v) => v == null ? 'Piliin ang sub-category' : null,
+                  validator: (v) =>
+                      v == null ? 'Piliin ang sub-category' : null,
                   onChanged: (v) {
                     setState(() {
                       _responseSubType = v;

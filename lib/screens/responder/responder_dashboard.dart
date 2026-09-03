@@ -10,6 +10,32 @@ import 'pcr_form_screen.dart';
 import 'pcr_form_standalone_screen.dart';
 import 'in_app_map_screen.dart';
 
+// =====================================================
+// SHARED DATE/TIME HELPERS
+// =====================================================
+
+const _monthNames = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+const _weekdayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+DateTime? _parseScheduleDate(dynamic value) {
+  if (value is Timestamp) return value.toDate();
+  if (value is DateTime) return value;
+  if (value is String) return DateTime.tryParse(value);
+  return null;
+}
+
+String _formatTime(DateTime dt) {
+  final hour24 = dt.hour;
+  final period = hour24 >= 12 ? 'PM' : 'AM';
+  var hour12 = hour24 % 12;
+  if (hour12 == 0) hour12 = 12;
+  final minute = dt.minute.toString().padLeft(2, '0');
+  return '$hour12:$minute $period';
+}
+
 class ResponderDashboard extends StatefulWidget {
   const ResponderDashboard({super.key});
 
@@ -62,6 +88,7 @@ class _ResponderDashboardState extends State<ResponderDashboard>
               pulseController: _pulseController,
               showDispatchDetails: _showDispatchDetails,
               acceptDispatch: _acceptDispatch,
+              openPcr: _openPcrForDoc,
             ),
             _PcrTab(
               openEmergencyPcr: _openEmergencyPcr,
@@ -135,6 +162,21 @@ class _ResponderDashboardState extends State<ResponderDashboard>
     final details = await _loadDispatchDetails(scheduleData);
     if (!context.mounted) return;
 
+    final status = scheduleData['status'] ?? 'approved';
+    final canGoEnRoute = status != 'in-transit' && status != 'completed';
+
+    // Contact and Pickup Address stay tappable (call / view map) no matter
+    // what. But En Route / PCR actions only unlock on the scheduled day
+    // itself — or if the dispatch was already actioned (in-transit /
+    // completed). Anything further out is view-only for now.
+    final scheduleDt = _parseScheduleDate(scheduleData['scheduleDate']);
+    final now = DateTime.now();
+    final isScheduledToday = scheduleDt != null &&
+        scheduleDt.year == now.year &&
+        scheduleDt.month == now.month &&
+        scheduleDt.day == now.day;
+    final canAct = isScheduledToday || status == 'in-transit' || status == 'completed';
+
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -174,7 +216,7 @@ class _ResponderDashboardState extends State<ResponderDashboard>
                         ),
                       ),
                       const SizedBox(width: 8),
-                      _StatusBadge(status: scheduleData['status'] ?? 'approved'),
+                      _StatusBadge(status: status),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -191,28 +233,83 @@ class _ResponderDashboardState extends State<ResponderDashboard>
                   ),
                   _detailActionLine(
                     icon: Icons.location_on_outlined,
-                    label: 'Pickup',
+                    label: 'Pickup Address',
                     value: details.location,
                     onTap: details.location == '-'
                         ? null
                         : () => _openMap(details.location),
                   ),
                   const SizedBox(height: 18),
-                  // ✅ WALANG ACCEPT BUTTON — PCR BUTTON NA LANG
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.icon(
-                          icon: const Icon(Icons.document_scanner_outlined),
-                          label: const Text('Open PCR Form'),
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _openPcr(context, doc, details);
-                          },
+                  if (canAct)
+                    // ✅ EN ROUTE BUTTON IS BACK — status only flips to
+                    // in-transit when this is explicitly tapped.
+                    Row(
+                      children: [
+                        if (canGoEnRoute) ...[
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.accent,
+                                side: const BorderSide(color: AppColors.accent),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              icon: const Icon(Icons.directions_car_filled_outlined),
+                              label: const Text('En Route'),
+                              onPressed: () async {
+                                await _acceptDispatch(context, doc);
+                                if (context.mounted) Navigator.pop(context);
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                        ],
+                        Expanded(
+                          child: FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            icon: const Icon(Icons.document_scanner_outlined),
+                            label: const Text('Scan PCR'),
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _openPcr(context, doc, details);
+                            },
+                          ),
                         ),
+                      ],
+                    )
+                  else
+                    // Not yet the scheduled day — view only. Contact and
+                    // Pickup Address above are still tappable to call or
+                    // open the map.
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: AppColors.textGray.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ],
-                  ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.visibility_outlined, size: 18, color: AppColors.textGray),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              scheduleDt != null
+                                  ? 'View only for now — En Route and PCR unlock on ${_monthNames[scheduleDt.month - 1]} ${scheduleDt.day}.'
+                                  : 'View only for now — actions unlock on the scheduled day.',
+                              style: const TextStyle(color: AppColors.textGray, fontWeight: FontWeight.w700, fontSize: 12.5),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -226,6 +323,7 @@ class _ResponderDashboardState extends State<ResponderDashboard>
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
@@ -272,6 +370,7 @@ class _ResponderDashboardState extends State<ResponderDashboard>
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -367,6 +466,18 @@ class _ResponderDashboardState extends State<ResponderDashboard>
     );
   }
 
+  // Wrapper so cards/rows can jump straight to the PCR form (loading the
+  // request/patient details first) without going through the bottom sheet.
+  Future<void> _openPcrForDoc(
+    BuildContext context,
+    QueryDocumentSnapshot doc,
+  ) async {
+    final scheduleData = doc.data() as Map<String, dynamic>;
+    final details = await _loadDispatchDetails(scheduleData);
+    if (!context.mounted) return;
+    _openPcr(context, doc, details);
+  }
+
   Future<void> _callNumber(String number) async {
     await _nativeActions.invokeMethod<void>('dial', {'number': number});
   }
@@ -452,6 +563,16 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
+// Returns the accent color used to represent a dispatch status throughout
+// the dashboard (badges, calendar chips, todo-list rows).
+Color _statusColor(String status) {
+  return switch (status) {
+    'in-transit' => AppColors.accent,
+    'completed' => AppColors.completed,
+    _ => AppColors.secondary,
+  };
+}
+
 // =====================================================
 // TAB 1: DISPATCH
 // =====================================================
@@ -461,10 +582,12 @@ class _DispatchTab extends StatelessWidget {
     required this.pulseController,
     required this.showDispatchDetails,
     required this.acceptDispatch,
+    required this.openPcr,
   });
   final AnimationController pulseController;
   final Future<void> Function(BuildContext, QueryDocumentSnapshot) showDispatchDetails;
   final Future<void> Function(BuildContext, QueryDocumentSnapshot) acceptDispatch;
+  final Future<void> Function(BuildContext, QueryDocumentSnapshot) openPcr;
 
   @override
   Widget build(BuildContext context) {
@@ -484,6 +607,7 @@ class _DispatchTab extends StatelessWidget {
               pulseController: pulseController,
               showDispatchDetails: showDispatchDetails,
               acceptDispatch: acceptDispatch,
+              openPcr: openPcr,
             ),
           ],
         );
@@ -506,6 +630,7 @@ class _Header extends StatelessWidget {
           const SizedBox(width: 14),
           Expanded(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
@@ -556,11 +681,13 @@ class _DispatchBody extends StatelessWidget {
     required this.pulseController,
     required this.showDispatchDetails,
     required this.acceptDispatch,
+    required this.openPcr,
   });
   final String uid;
   final AnimationController pulseController;
   final Future<void> Function(BuildContext, QueryDocumentSnapshot) showDispatchDetails;
   final Future<void> Function(BuildContext, QueryDocumentSnapshot) acceptDispatch;
+  final Future<void> Function(BuildContext, QueryDocumentSnapshot) openPcr;
 
   @override
   Widget build(BuildContext context) {
@@ -591,17 +718,8 @@ class _DispatchBody extends StatelessWidget {
             final bData = b.data() as Map<String, dynamic>;
             int getMillis(d) {
               final v = d['scheduleDate'];
-              if (v is Timestamp) {
-                return v.millisecondsSinceEpoch;
-              }
-              if (v is DateTime) {
-                return v.millisecondsSinceEpoch;
-              }
-              if (v is String) {
-                final parsed = DateTime.tryParse(v);
-                return parsed?.millisecondsSinceEpoch ?? 0;
-              }
-              return 0;
+              final parsed = _parseScheduleDate(v);
+              return parsed?.millisecondsSinceEpoch ?? 0;
             }
             return getMillis(aData).compareTo(getMillis(bData));
           });
@@ -612,15 +730,7 @@ class _DispatchBody extends StatelessWidget {
         }).toList();
 
         bool isToday(Map<String, dynamic> data) {
-          final value = data['scheduleDate'];
-          DateTime? sd;
-          if (value is Timestamp) {
-            sd = value.toDate();
-          } else if (value is DateTime) {
-            sd = value;
-          } else if (value is String) {
-            sd = DateTime.tryParse(value);
-          }
+          final sd = _parseScheduleDate(data['scheduleDate']);
           if (sd == null) return false;
           final now = DateTime.now();
           return sd.year == now.year && sd.month == now.month && sd.day == now.day;
@@ -638,6 +748,15 @@ class _DispatchBody extends StatelessWidget {
         }
 
         return Column(
+          // ✅ FIX: without this, the Column defaults to
+          // MainAxisSize.max and — since this whole widget sits
+          // directly inside a ListView's `children:` (unbounded
+          // height on the scroll axis) — it tries to become
+          // infinitely tall. That's exactly what triggers
+          // "BoxConstraints forces an infinite height." and the
+          // follow-on "Cannot hit test a render box with no size."
+          // `min` makes the Column size itself to its children instead.
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: const EdgeInsets.all(4),
@@ -646,54 +765,62 @@ class _DispatchBody extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: AppColors.border),
               ),
-              child: GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 1.05,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  _DashboardCard(
-                    label: 'Assigned Dispatch',
-                    value: '${assigned.length}',
-                    icon: Icons.assignment_turned_in_outlined,
-                    color: AppColors.primary,
-                    onTap: assigned.isEmpty
-                        ? null
-                        : () async {
-                            final first = assigned.first;
-                            final data = first.data() as Map<String, dynamic>;
-                            if (data['status'] != 'in-transit') {
-                              await acceptDispatch(context, first);
-                            }
-                            if (context.mounted) {
-                              await showDispatchDetails(context, first);
-                            }
-                          },
+                  Row(
+                    children: [
+                      Expanded(
+                        child: AspectRatio(
+                          aspectRatio: 1.05,
+                          child: _DashboardCard(
+                            label: 'Assigned Dispatch',
+                            value: '${assigned.length}',
+                            icon: Icons.assignment_turned_in_outlined,
+                            color: AppColors.primary,
+                            // ✅ Viewing the count no longer auto-accepts
+                            // the dispatch — accepting only happens via
+                            // the explicit "En Route" button.
+                            onTap: assigned.isEmpty
+                                ? null
+                                : () => showDispatchDetails(context, assigned.first),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: AspectRatio(
+                          aspectRatio: 1.05,
+                          child: _DashboardCard(
+                            label: 'Emergency PCR',
+                            value: 'Scan Now',
+                            icon: Icons.document_scanner_outlined,
+                            color: AppColors.secondary,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const PCRStandaloneFormScreen()),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  _DashboardCard(
-                    label: 'Emergency PCR',
-                    value: 'Scan Now',
-                    icon: Icons.document_scanner_outlined,
-                    color: AppColors.secondary,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const PCRStandaloneFormScreen()),
-                      );
-                    },
-                  ),
+                  const SizedBox(height: 12),
+                  // Full-width so it doesn't leave dead space next to it
+                  // when it's the odd one out.
                   _DashboardCard(
                     label: 'Notifications',
                     value: assigned.isEmpty ? 'Clear' : '${assigned.length} new',
                     icon: Icons.notifications_active_outlined,
                     color: AppColors.warning,
+                    wide: true,
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 22),
             Row(
               children: [
                 _LivePulse(controller: pulseController),
@@ -718,8 +845,9 @@ class _DispatchBody extends StatelessWidget {
                     doc: doc,
                     showDispatchDetails: showDispatchDetails,
                     acceptDispatch: acceptDispatch,
+                    openPcr: openPcr,
                   )),
-            const SizedBox(height: 24),
+            const SizedBox(height: 26),
             const Row(
               children: [
                 Icon(Icons.event_note_outlined, size: 20, color: AppColors.textGray),
@@ -737,11 +865,10 @@ class _DispatchBody extends StatelessWidget {
                 ),
               )
             else
-              ...otherSchedules.map((doc) => _DispatchCard(
-                    doc: doc,
-                    showDispatchDetails: showDispatchDetails,
-                    acceptDispatch: acceptDispatch,
-                  )),
+              _OtherSchedulesCalendarList(
+                schedules: otherSchedules,
+                showDispatchDetails: showDispatchDetails,
+              ),
           ],
         );
       },
@@ -756,12 +883,14 @@ class _DashboardCard extends StatelessWidget {
     required this.icon,
     required this.color,
     this.onTap,
+    this.wide = false,
   });
   final String label;
   final String value;
   final IconData icon;
   final Color color;
   final VoidCallback? onTap;
+  final bool wide;
 
   @override
   Widget build(BuildContext context) {
@@ -778,21 +907,36 @@ class _DashboardCard extends StatelessWidget {
             border: Border.all(color: AppColors.border),
             boxShadow: [BoxShadow(color: AppColors.dark.withValues(alpha: 0.06), blurRadius: 18, offset: const Offset(0, 10))],
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(9),
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const SizedBox(height: 10),
-              FittedBox(fit: BoxFit.scaleDown, child: Text(value, style: const TextStyle(color: AppColors.dark, fontSize: 19, fontWeight: FontWeight.w900))),
-              const SizedBox(height: 2),
-              Flexible(child: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textGray, fontSize: 11.5, fontWeight: FontWeight.w800))),
-            ],
-          ),
+          child: wide
+              ? Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(9),
+                      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+                      child: Icon(icon, color: color, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(label, style: const TextStyle(color: AppColors.textGray, fontSize: 11.5, fontWeight: FontWeight.w800)),
+                    ),
+                    Text(value, style: const TextStyle(color: AppColors.dark, fontSize: 17, fontWeight: FontWeight.w900)),
+                  ],
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(9),
+                      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+                      child: Icon(icon, color: color, size: 20),
+                    ),
+                    const SizedBox(height: 10),
+                    FittedBox(fit: BoxFit.scaleDown, child: Text(value, style: const TextStyle(color: AppColors.dark, fontSize: 19, fontWeight: FontWeight.w900))),
+                    const SizedBox(height: 2),
+                    Flexible(child: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textGray, fontSize: 11.5, fontWeight: FontWeight.w800))),
+                  ],
+                ),
         ),
       ),
     );
@@ -837,30 +981,31 @@ class _DispatchCard extends StatelessWidget {
     required this.doc,
     required this.showDispatchDetails,
     required this.acceptDispatch,
+    required this.openPcr,
   });
   final QueryDocumentSnapshot doc;
   final Future<void> Function(BuildContext, QueryDocumentSnapshot) showDispatchDetails;
   final Future<void> Function(BuildContext, QueryDocumentSnapshot) acceptDispatch;
+  final Future<void> Function(BuildContext, QueryDocumentSnapshot) openPcr;
 
   @override
   Widget build(BuildContext context) {
     final data = doc.data() as Map<String, dynamic>;
+    final status = data['status'] ?? 'approved';
+    final canGoEnRoute = status != 'in-transit' && status != 'completed';
+    final address = (data['pickUpLocation'] ?? '-').toString();
+
     return GlassCard(
-      radius: 12,
+      radius: 14,
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       child: InkWell(
+        // ✅ Tapping the card now only opens the details sheet — status no
+        // longer flips to "in-transit" until the En Route button is used.
         borderRadius: BorderRadius.circular(8),
-        // ✅ PAG PININDOT → AUTOMATIC NA EN ROUTE AGAD!
-        onTap: () async {
-          if (data['status'] != 'in-transit') {
-            await acceptDispatch(context, doc);
-          }
-          if (context.mounted) {
-            await showDispatchDetails(context, doc);
-          }
-        },
+        onTap: () => showDispatchDetails(context, doc),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -868,6 +1013,7 @@ class _DispatchCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
@@ -883,18 +1029,21 @@ class _DispatchCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                _StatusBadge(status: data['status'] ?? 'approved'),
+                _StatusBadge(status: status),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
+            // Pickup address — shown right above the action buttons below,
+            // so each dispatch's address stays attached to its buttons.
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Icon(Icons.location_on_outlined, size: 16, color: AppColors.secondary),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    data['pickUpLocation'] ?? '-',
-                    maxLines: 1,
+                    address,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
@@ -902,20 +1051,361 @@ class _DispatchCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            // ✅ WALANG ACCEPT BUTTON — PCR BUTTON NA LANG
+            // ✅ EN ROUTE BUTTON IS BACK, alongside Scan PCR.
             Row(
               children: [
+                if (canGoEnRoute) ...[
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.accent,
+                        side: const BorderSide(color: AppColors.accent),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.directions_car_filled_outlined, size: 18),
+                      label: const Text('En Route'),
+                      onPressed: () => acceptDispatch(context, doc),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
                 Expanded(
                   child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
                     icon: const Icon(Icons.document_scanner_outlined, size: 18),
-                    label: const Text('PCR / Report'),
-                    onPressed: () {
-                      // Punan mo na ng PCR action kung kailangan
-                    },
+                    label: const Text('Scan PCR'),
+                    onPressed: () => openPcr(context, doc),
                   ),
                 ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// =====================================================
+// OTHER SCHEDULES — MONTH CALENDAR GRID
+// =====================================================
+
+class _OtherSchedulesCalendarList extends StatefulWidget {
+  const _OtherSchedulesCalendarList({
+    required this.schedules,
+    required this.showDispatchDetails,
+  });
+
+  final List<QueryDocumentSnapshot> schedules;
+  final Future<void> Function(BuildContext, QueryDocumentSnapshot) showDispatchDetails;
+
+  @override
+  State<_OtherSchedulesCalendarList> createState() => _OtherSchedulesCalendarListState();
+}
+
+class _OtherSchedulesCalendarListState extends State<_OtherSchedulesCalendarList> {
+  late DateTime _displayedMonth;
+  late DateTime _selectedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    final byDate = _groupByDate();
+    final sortedDates = byDate.keys.toList()..sort();
+    // Land on today's month if there's an entry there, otherwise the
+    // month of the earliest "other" schedule.
+    final now = DateTime.now();
+    final hasCurrentMonth = sortedDates.any((d) => d.year == now.year && d.month == now.month);
+    final anchor = hasCurrentMonth || sortedDates.isEmpty ? now : sortedDates.first;
+    _displayedMonth = DateTime(anchor.year, anchor.month, 1);
+    _selectedDate = sortedDates.isEmpty ? now : sortedDates.first;
+  }
+
+  Map<DateTime, List<QueryDocumentSnapshot>> _groupByDate() {
+    final groups = <DateTime, List<QueryDocumentSnapshot>>{};
+    for (final doc in widget.schedules) {
+      final data = doc.data() as Map<String, dynamic>;
+      final dt = _parseScheduleDate(data['scheduleDate']) ?? DateTime.now();
+      final key = DateTime(dt.year, dt.month, dt.day);
+      groups.putIfAbsent(key, () => []).add(doc);
+    }
+    return groups;
+  }
+
+  void _changeMonth(int delta) {
+    setState(() {
+      _displayedMonth = DateTime(_displayedMonth.year, _displayedMonth.month + delta, 1);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final byDate = _groupByDate();
+    final daysInMonth = DateTime(_displayedMonth.year, _displayedMonth.month + 1, 0).day;
+    final firstWeekday = DateTime(_displayedMonth.year, _displayedMonth.month, 1).weekday; // 1=Mon..7=Sun
+    final leadingBlanks = firstWeekday - 1;
+    final totalCells = ((leadingBlanks + daysInMonth) / 7).ceil() * 7;
+
+    final selectedDocs = byDate[_selectedDate] ?? const [];
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [BoxShadow(color: AppColors.dark.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 6))],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Month header with prev/next navigation.
+          Row(
+            children: [
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.chevron_left_rounded, color: AppColors.textGray),
+                onPressed: () => _changeMonth(-1),
+              ),
+              Expanded(
+                child: Text(
+                  '${_fullMonthName(_displayedMonth.month)} ${_displayedMonth.year}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.dark),
+                ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.chevron_right_rounded, color: AppColors.textGray),
+                onPressed: () => _changeMonth(1),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          // Weekday header row.
+          Row(
+            children: [
+              for (final w in _weekdayNames)
+                Expanded(
+                  child: Center(
+                    child: Text(w.substring(0, 2), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.textGray)),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          // Day grid.
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: totalCells,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              mainAxisSpacing: 4,
+              crossAxisSpacing: 4,
+              childAspectRatio: 1,
+            ),
+            itemBuilder: (context, index) {
+              final dayNum = index - leadingBlanks + 1;
+              if (dayNum < 1 || dayNum > daysInMonth) {
+                return const SizedBox.shrink();
+              }
+              final cellDate = DateTime(_displayedMonth.year, _displayedMonth.month, dayNum);
+              final docsForDay = byDate[cellDate] ?? const [];
+              final isSelected = cellDate == _selectedDate;
+              final isToday = cellDate.year == DateTime.now().year &&
+                  cellDate.month == DateTime.now().month &&
+                  cellDate.day == DateTime.now().day;
+
+              Color? dotColor;
+              if (docsForDay.isNotEmpty) {
+                final firstStatus = (docsForDay.first.data() as Map<String, dynamic>)['status'] ?? 'approved';
+                dotColor = _statusColor(firstStatus);
+              }
+
+              return _MonthDayCell(
+                dayNum: dayNum,
+                isSelected: isSelected,
+                isToday: isToday,
+                dotColor: dotColor,
+                scheduleCount: docsForDay.length,
+                onTap: docsForDay.isEmpty
+                    ? null
+                    : () => setState(() => _selectedDate = cellDate),
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+          const Divider(height: 1, color: AppColors.border),
+          const SizedBox(height: 12),
+          Text(
+            '${_weekdayNames[_selectedDate.weekday - 1]}, ${_monthNames[_selectedDate.month - 1]} ${_selectedDate.day}',
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.dark),
+          ),
+          const SizedBox(height: 10),
+          if (selectedDocs.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 10),
+              child: Text('No dispatch on this date.', style: TextStyle(color: AppColors.textGray)),
+            )
+          else
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 0; i < selectedDocs.length; i++) ...[
+                  _TodoRow(doc: selectedDocs[i], showDispatchDetails: widget.showDispatchDetails),
+                  if (i != selectedDocs.length - 1)
+                    const Divider(height: 1, color: AppColors.border),
+                ],
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+String _fullMonthName(int month) {
+  const names = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  return names[month - 1];
+}
+
+class _MonthDayCell extends StatelessWidget {
+  const _MonthDayCell({
+    required this.dayNum,
+    required this.isSelected,
+    required this.isToday,
+    required this.dotColor,
+    required this.scheduleCount,
+    required this.onTap,
+  });
+
+  final int dayNum;
+  final bool isSelected;
+  final bool isToday;
+  final Color? dotColor;
+  final int scheduleCount;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasSchedule = dotColor != null;
+    final bg = isSelected
+        ? AppColors.primary
+        : hasSchedule
+            ? AppColors.primary.withValues(alpha: 0.08)
+            : Colors.transparent;
+    final textColor = isSelected ? Colors.white : AppColors.dark;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(10),
+          border: isToday && !isSelected ? Border.all(color: AppColors.primary, width: 1.2) : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '$dayNum',
+              style: TextStyle(
+                color: hasSchedule || isSelected ? textColor : AppColors.textGray,
+                fontSize: 13,
+                fontWeight: hasSchedule || isSelected ? FontWeight.w900 : FontWeight.w600,
+              ),
+            ),
+            if (hasSchedule) ...[
+              const SizedBox(height: 2),
+              Container(
+                width: 5,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.white : dotColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TodoRow extends StatelessWidget {
+  const _TodoRow({required this.doc, required this.showDispatchDetails});
+  final QueryDocumentSnapshot doc;
+  final Future<void> Function(BuildContext, QueryDocumentSnapshot) showDispatchDetails;
+
+  @override
+  Widget build(BuildContext context) {
+    final data = doc.data() as Map<String, dynamic>;
+    final status = data['status'] ?? 'approved';
+    final color = _statusColor(status);
+    final address = (data['pickUpLocation'] ?? '-').toString();
+    final scheduleDt = _parseScheduleDate(data['scheduleDate']);
+
+    final statusIcon = switch (status) {
+      'in-transit' => Icons.directions_car_rounded,
+      'completed' => Icons.check_circle_rounded,
+      _ => Icons.radio_button_unchecked_rounded,
+    };
+
+    return InkWell(
+      onTap: () => showDispatchDetails(context, doc),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(statusIcon, color: color, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          data['patientName'] ?? 'Patient',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: AppColors.dark),
+                        ),
+                      ),
+                      if (scheduleDt != null) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          _formatTime(scheduleDt),
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textGray),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    address,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: AppColors.textGray, fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.chevron_right, color: AppColors.textLight, size: 20),
           ],
         ),
       ),
@@ -939,6 +1429,7 @@ class _PcrTab extends StatelessWidget {
         const SizedBox(height: 30),
         Center(
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Container(
                 width: 120,
