@@ -147,7 +147,7 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
     try {
       // Driver accounts can use different role spellings depending on where
       // the account was created, so filter the users collection locally.
-      final snap = await FirebaseFirestore.instance.collection('users').get();
+      final snap = await FirebaseFirestore.instance.collection('responders').get();
       final options = snap.docs
           .where((doc) {
             final data = doc.data();
@@ -184,7 +184,7 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
             final data = doc.data();
             return {
               'id': doc.id,
-              'label': (data['name'] ?? data['fullName'] ?? doc.id).toString(),
+              'label': (data['responder_name'] ?? data['name'] ?? data['fullName'] ?? doc.id).toString(),
             };
           })
           .toList();
