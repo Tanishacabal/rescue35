@@ -23,6 +23,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _obscurePass = true;
   bool _rememberMe = false;
+  bool _passwordAuthError = false;
   String? _errorMessage;
   int _failedAttempts = 0;
   DateTime? _lockedUntil;
@@ -41,6 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _passwordAuthError = false;
     });
 
     final error = await _authService.login(
@@ -56,6 +58,8 @@ class _LoginScreenState extends State<LoginScreen> {
         }
         _isLoading = false;
         _errorMessage = error;
+        _passwordAuthError = error == 'Wrong password. Please try again.' ||
+          error == 'Login failed. Please try again.';
       });
       return;
     }
@@ -225,10 +229,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextFormField(
                           controller: _passwordCtrl,
                           obscureText: _obscurePass,
+                          onChanged: (_) {
+                            if (_passwordAuthError) {
+                              setState(() => _passwordAuthError = false);
+                            }
+                          },
                           decoration: rescueInputDecoration(
                             'Password',
                             Icons.lock_outline,
                           ).copyWith(
+                            errorText: _passwordAuthError ? '' : null,
                             suffixIcon: IconButton(
                               icon: Icon(
                                 _obscurePass

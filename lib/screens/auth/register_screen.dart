@@ -395,51 +395,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
               },
             ),
             _gap(),
-            // First Name (flexible) + M.I. (fixed narrow width) share a row.
-            // First Name always has enough room since M.I. only needs ~1
-            // character, so its label ("M.I.") never truncates either.
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _field(
-                    _firstNameCtrl,
-                    'First Name',
-                    Icons.person_outline,
-                    textCapitalization: TextCapitalization.characters,
-                    inputFormatters: [_UpperCaseTextFormatter()],
-                    validator: (v) {
-                      final text = (v ?? '').trim();
-                      if (text.isEmpty) return 'First name is required';
-                      if (text.length < 2) return 'Minimum 2 characters';
-                      return RegExp(r"^[a-zA-Z\s.'-]+$").hasMatch(text)
-                          ? null
-                          : 'Letters only';
-                    },
-                  ),
-                ),
-                const SizedBox(width: 10),
-                SizedBox(
-                  width: 84,
-                  child: _field(
-                    _middleInitialCtrl,
-                    'M.I.',
-                    Icons.short_text_rounded,
-                    textCapitalization: TextCapitalization.characters,
-                    inputFormatters: [
-                      _UpperCaseTextFormatter(),
-                      LengthLimitingTextInputFormatter(1),
-                    ],
-                    validator: (v) {
-                      final text = (v ?? '').trim();
-                      if (text.isEmpty) return null;
-                      return RegExp(r"^[A-Z]$").hasMatch(text)
-                          ? null
-                          : '1 letter';
-                    },
-                  ),
-                ),
+            _field(
+              _firstNameCtrl,
+              'First Name',
+              Icons.person_outline,
+              textCapitalization: TextCapitalization.characters,
+              inputFormatters: [_UpperCaseTextFormatter()],
+              validator: (v) {
+                final text = (v ?? '').trim();
+                if (text.isEmpty) return 'First name is required';
+                if (text.length < 2) return 'Minimum 2 characters';
+                return RegExp(r"^[a-zA-Z\s.'-]+$").hasMatch(text)
+                    ? null
+                    : 'Letters only';
+              },
+            ),
+            _gap(),
+            _field(
+              _middleInitialCtrl,
+              'Middle Initial',
+              Icons.short_text_rounded,
+              textCapitalization: TextCapitalization.characters,
+              inputFormatters: [
+                _UpperCaseTextFormatter(),
+                LengthLimitingTextInputFormatter(1),
               ],
+              required: false,
+              validator: (v) {
+                final text = (v ?? '').trim();
+                if (text.isEmpty) return null;
+                return RegExp(r"^[A-Z]$").hasMatch(text) ? null : '1 letter';
+              },
             ),
             _gap(),
             _field(
@@ -697,6 +683,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     TextInputType inputType = TextInputType.text,
     TextCapitalization textCapitalization = TextCapitalization.none,
     List<TextInputFormatter>? inputFormatters,
+    bool required = true,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
@@ -704,7 +691,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       keyboardType: inputType,
       textCapitalization: textCapitalization,
       inputFormatters: inputFormatters,
-      decoration: rescueInputDecoration(label, icon),
+      decoration: rescueInputDecoration(label, icon, required: required),
       validator: validator,
     );
   }

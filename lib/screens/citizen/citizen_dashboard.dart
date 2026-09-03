@@ -41,13 +41,14 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
     return Scaffold(
       extendBody: true,
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
             colors: [
-              AppColors.primary.withValues(alpha: 0.08),
-              Colors.white,
+              Color(0xFFF8FAFC),
+              Color(0xFFF2F7FF),
+              Color(0xFFFDF3F3),
             ],
           ),
         ),

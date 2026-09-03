@@ -176,9 +176,9 @@ class PrimaryButton extends StatelessWidget {
 }
 
 InputDecoration rescueInputDecoration(String label, IconData icon,
-    {String? hint}) {
+    {String? hint, bool required = true}) {
   return InputDecoration(
-    labelText: label,
+    labelText: required ? '$label *' : '$label (Optional)',
     hintText: hint,
     prefixIcon: Icon(icon, color: AppColors.textGray, size: 20),
     filled: true,
@@ -200,6 +200,10 @@ InputDecoration rescueInputDecoration(String label, IconData icon,
     errorBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(16),
       borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
+    ),
+    focusedErrorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: const BorderSide(color: AppColors.primary, width: 1.8),
     ),
   );
 }

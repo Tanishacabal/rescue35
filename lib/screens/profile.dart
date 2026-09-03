@@ -196,12 +196,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           final isVerified = accountStatus != 'pending' && accountStatus != 'rejected';
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // === HEADER CARD ===
-                _headerCard(context, name, roleLabel, isVerified),
+                _headerCard(name, roleLabel, isVerified),
                 const SizedBox(height: 28),
 
                 // === PERSONAL INFORMATION ===
@@ -211,13 +211,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     children: [
-                      _detailRow('Full Name', name),
+                      _detailRow(Icons.badge_outlined, 'Full Name', name),
                       const SizedBox(height: 16),
-                      _detailRow('Email Address', email),
+                      _detailRow(Icons.email_outlined, 'Email Address', email),
                       const SizedBox(height: 16),
-                      _detailRow('Mobile Number', contact),
+                      _detailRow(Icons.phone_outlined, 'Mobile Number', contact),
                       const SizedBox(height: 16),
-                      _detailRow('Account Role', roleLabel),
+                      _detailRow(Icons.person_outline, 'Account Role', roleLabel),
                     ],
                   ),
                 ),
@@ -231,11 +231,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     padding: const EdgeInsets.all(20),
                     child: Column(
                       children: [
-                        _detailRow('Barangay', barangay),
+                        _detailRow(Icons.location_city_outlined, 'Barangay', barangay),
                         const SizedBox(height: 16),
-                        _detailRow('Municipality / City', municipality),
+                        _detailRow(Icons.business_outlined, 'Municipality / City', municipality),
                         const SizedBox(height: 16),
-                        _detailRow('Province', province),
+                        _detailRow(Icons.map_outlined, 'Province', province),
                       ],
                     ),
                   ),
@@ -250,7 +250,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _detailRow('Current Status', accountStatus.toUpperCase()),
+                      _detailRow(
+                        Icons.verified_outlined,
+                        'Current Status',
+                        accountStatus.toUpperCase(),
+                      ),
                       const SizedBox(height: 16),
                       Container(
                         width: double.infinity,
@@ -339,54 +343,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return userData;
   }
 
-  Widget _headerCard(BuildContext context, String name, String roleLabel, bool isVerified) {
+  Widget _headerCard(String name, String roleLabel, bool isVerified) {
     return GlassCard(
       color: AppColors.primary,
-      padding: const EdgeInsets.all(22),
+      radius: 24,
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
       child: Column(
         children: [
-          Row(
-            children: [
-              _avatar(roleLabel),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        roleLabel,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+          _avatar(roleLabel),
+          const SizedBox(height: 14),
+          Text(
+            name,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              roleLabel,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
               ),
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              ),
-            ],
+            ),
           ),
           const SizedBox(height: 16),
           Container(
@@ -467,28 +458,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _detailRow(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.textGray,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
+  Widget _detailRow(IconData icon, String label, String value) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: AppColors.primary, size: 19),
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(
-            color: AppColors.dark,
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: AppColors.textGray,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.dark,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

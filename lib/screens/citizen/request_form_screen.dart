@@ -1069,10 +1069,11 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           _gap(),
           _field(
             _notesCtrl,
-            'Additional Notes (Optional)',
+            'Additional Notes',
             Icons.note_alt_outlined,
             maxLines: 2,
             inputFormatters: [LengthLimitingTextInputFormatter(500)],
+            required: false,
             validator: (v) {
               final text = (v ?? '').trim();
               if (text.isEmpty) return null;
@@ -1185,38 +1186,29 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           validator: (v) => validateName(v, label: 'Last name'),
         ),
         const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _field(
-                firstCtrl,
-                'First Name',
-                Icons.person_outline,
-                textCapitalization: TextCapitalization.characters,
-                inputFormatters: [
-                  _UpperCaseTextFormatter(),
-                  LengthLimitingTextInputFormatter(50),
-                ],
-                validator: (v) => validateName(v, label: 'First name'),
-              ),
-            ),
-            const SizedBox(width: 10),
-            SizedBox(
-              width: 84,
-              child: _field(
-                miCtrl,
-                'M.I.',
-                Icons.short_text_rounded,
-                textCapitalization: TextCapitalization.characters,
-                inputFormatters: [
-                  _UpperCaseTextFormatter(),
-                  LengthLimitingTextInputFormatter(1),
-                ],
-                validator: validateMiddleInitial,
-              ),
-            ),
+        _field(
+          firstCtrl,
+          'First Name',
+          Icons.person_outline,
+          textCapitalization: TextCapitalization.characters,
+          inputFormatters: [
+            _UpperCaseTextFormatter(),
+            LengthLimitingTextInputFormatter(50),
           ],
+          validator: (v) => validateName(v, label: 'First name'),
+        ),
+        const SizedBox(height: 10),
+        _field(
+          miCtrl,
+          'Middle Initial',
+          Icons.short_text_rounded,
+          textCapitalization: TextCapitalization.characters,
+          inputFormatters: [
+            _UpperCaseTextFormatter(),
+            LengthLimitingTextInputFormatter(1),
+          ],
+          required: false,
+          validator: validateMiddleInitial,
         ),
       ],
     );
@@ -1231,6 +1223,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     TextInputType inputType = TextInputType.text,
     TextCapitalization textCapitalization = TextCapitalization.none,
     List<TextInputFormatter>? inputFormatters,
+    bool required = true,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
@@ -1239,7 +1232,12 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       keyboardType: inputType,
       textCapitalization: textCapitalization,
       inputFormatters: inputFormatters,
-      decoration: rescueInputDecoration(label, icon, hint: hint),
+      decoration: rescueInputDecoration(
+        label,
+        icon,
+        hint: hint,
+        required: required,
+      ),
       validator: validator,
     );
   }
