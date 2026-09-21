@@ -5,6 +5,7 @@ import '../../constants/app_colors.dart';
 import '../../widgets/design_system.dart';
 import 'dart:io';
 import '../../services/ocr_service.dart';
+import '../../services/activity_log_service.dart';
 import 'package:image_picker/image_picker.dart';
 
 /// PCR form para sa mga NAKA-SCHEDULE na dispatch lang.
@@ -44,7 +45,13 @@ class _PCRFormScreenState extends State<PCRFormScreen> {
   String? _responseSubType;
   final _otherSubTypeCtrl = TextEditingController();
 
-  final _responseTypes = const ['Emergency', 'Trauma', 'Medical', 'Transfer', 'OB'];
+  final _responseTypes = const [
+    'Emergency',
+    'Trauma',
+    'Medical',
+    'Transfer',
+    'OB',
+  ];
 
   final _emergencySubTypes = const [
     'Cardiac Arrest',
@@ -114,7 +121,7 @@ class _PCRFormScreenState extends State<PCRFormScreen> {
           .collection('users')
           .doc(uid)
           .get();
-      
+
       if (doc.exists) {
         final data = doc.data() ?? {};
         setState(() {
@@ -436,7 +443,7 @@ class _PCRFormScreenState extends State<PCRFormScreen> {
       final resolvedDriverID =
           widget.scheduleData['driverID']?.toString() ?? '';
 
-      await db.collection('pcr_reports').add({
+      final pcrReport = await db.collection('pcr_reports').add({
         'scheduleID': widget.scheduleID,
         'patientID': widget.requestData['patientID'] ?? '',
         'patientName': resolvedPatientName,
@@ -463,10 +470,9 @@ class _PCRFormScreenState extends State<PCRFormScreen> {
         'isStandalone': false,
       });
 
-      await db
-          .collection('transport_schedules')
-          .doc(widget.scheduleID)
-          .update({'status': 'completed'});
+      await db.collection('transport_schedules').doc(widget.scheduleID).update({
+        'status': 'completed',
+      });
 
       final requestID = widget.requestData['requestID']?.toString() ?? '';
       if (requestID.isNotEmpty) {
@@ -480,6 +486,18 @@ class _PCRFormScreenState extends State<PCRFormScreen> {
           'status': 'available',
         });
       }
+
+      await ActivityLogService.log(
+        action: 'pcr_report_submitted',
+        description: 'Submitted PCR report for $resolvedPatientName.',
+        entityType: 'pcr_report',
+        entityId: pcrReport.id,
+        metadata: {
+          'scheduleID': widget.scheduleID,
+          'requestID': requestID,
+          'vehicleID': resolvedVehicleID,
+        },
+      );
 
       if (!mounted) return;
 
@@ -510,9 +528,7 @@ class _PCRFormScreenState extends State<PCRFormScreen> {
           title: const Text('PCR Report Form'),
           elevation: 0,
         ),
-        body: const Center(
-          child: CircularProgressIndicator(),
-        ),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -534,13 +550,12 @@ class _PCRFormScreenState extends State<PCRFormScreen> {
               const SizedBox(height: 12),
               _readOnlyInfoRow(
                 'Responder Name',
-                _responderNameCtrl.text.isEmpty ? _responderIdCtrl.text : _responderNameCtrl.text,
+                _responderNameCtrl.text.isEmpty
+                    ? _responderIdCtrl.text
+                    : _responderNameCtrl.text,
               ),
               const SizedBox(height: 8),
-              _readOnlyInfoRow(
-                'ID',
-                _responderIdCtrl.text,
-              ),
+              _readOnlyInfoRow('ID', _responderIdCtrl.text),
               const SizedBox(height: 24),
 
               _sectionHeader('Patient & Ambulance'),
@@ -584,11 +599,14 @@ class _PCRFormScreenState extends State<PCRFormScreen> {
                 DropdownButtonFormField<String>(
                   initialValue: _responseSubType,
                   isExpanded: true,
-                  decoration: _dropdownDecoration('$_typeOfResponse Sub-Category'),
+                  decoration: _dropdownDecoration(
+                    '$_typeOfResponse Sub-Category',
+                  ),
                   items: _activeSubTypes
                       .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                       .toList(),
-                  validator: (v) => v == null ? 'Sub-category is required' : null,
+                  validator: (v) =>
+                      v == null ? 'Sub-category is required' : null,
                   onChanged: (v) {
                     setState(() {
                       _responseSubType = v;
@@ -629,10 +647,7 @@ class _PCRFormScreenState extends State<PCRFormScreen> {
                 maxLines: 2,
               ),
               const SizedBox(height: 12),
-              _buildField(
-                _painLocationCtrl,
-                'Pain Location',
-              ),
+              _buildField(_painLocationCtrl, 'Pain Location'),
               const SizedBox(height: 24),
 
               _sectionHeader('Vital Signs'),
@@ -693,11 +708,7 @@ class _PCRFormScreenState extends State<PCRFormScreen> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _buildField(
-                      _timeCtrl,
-                      'Time',
-                      hint: 'HH:MM',
-                    ),
+                    child: _buildField(_timeCtrl, 'Time', hint: 'HH:MM'),
                   ),
                 ],
               ),
@@ -907,10 +918,7 @@ class _PCRFormScreenState extends State<PCRFormScreen> {
           const SizedBox(height: 2),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
           ),
         ],
       ),

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/services.dart';
 import '../../constants/app_colors.dart';
 import '../../services/auth_service.dart';
+import '../../services/call_log_service.dart';
 import '../../widgets/design_system.dart';
 import '../auth/login_screen.dart';
 import '../profile.dart';
@@ -18,7 +18,6 @@ class CitizenDashboard extends StatefulWidget {
 }
 
 class _CitizenDashboardState extends State<CitizenDashboard> {
-  static const _nativeActions = MethodChannel('rescue35/native_actions');
   int _selectedIndex = 0;
 
   static const _navItems = [
@@ -77,8 +76,13 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
     return str.isEmpty ? null : str;
   }
 
+  // ✅ Itinatala na sa call_logs bago buksan ang dialer
   Future<void> _callNumber(String number) async {
-    await _nativeActions.invokeMethod<void>('dial', {'number': number});
+    await CallLogService.callAndLog(
+      calleeNumber: number,
+      calleeName: 'RESCUE 35 Hotline',
+      calleeRole: 'admin',
+    );
   }
 
   Future<void> _confirmHotline(BuildContext context) async {

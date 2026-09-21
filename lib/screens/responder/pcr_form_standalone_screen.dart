@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../constants/app_colors.dart';
 import 'dart:io';
 import '../../services/ocr_service.dart';
+import '../../services/activity_log_service.dart';
 import 'package:image_picker/image_picker.dart';
 
 /// PCR form para sa EMERGENCY / WALK-IN na sitwasyon — WALANG naka-link
@@ -147,7 +148,9 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
     try {
       // Driver accounts can use different role spellings depending on where
       // the account was created, so filter the users collection locally.
-      final snap = await FirebaseFirestore.instance.collection('responders').get();
+      final snap = await FirebaseFirestore.instance
+          .collection('responders')
+          .get();
       final options = snap.docs
           .where((doc) {
             final data = doc.data();
@@ -184,7 +187,12 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
             final data = doc.data();
             return {
               'id': doc.id,
-              'label': (data['responder_name'] ?? data['name'] ?? data['fullName'] ?? doc.id).toString(),
+              'label':
+                  (data['responder_name'] ??
+                          data['name'] ??
+                          data['fullName'] ??
+                          doc.id)
+                      .toString(),
             };
           })
           .toList();
@@ -473,7 +481,7 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
               )['label']
               as String;
 
-      await db.collection('pcr_reports').add({
+      final pcrReport = await db.collection('pcr_reports').add({
         'scheduleID': '',
         'patientID': '',
         'patientName': _patientNameCtrl.text.trim(),
@@ -499,6 +507,18 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
         'datesubmitted': FieldValue.serverTimestamp(),
         'isStandalone': true,
       });
+
+      await ActivityLogService.log(
+        action: 'emergency_pcr_report_submitted',
+        description:
+            'Submitted an emergency PCR report for ${_patientNameCtrl.text.trim()}.',
+        entityType: 'pcr_report',
+        entityId: pcrReport.id,
+        metadata: {
+          'vehicleID': _selectedVehicleID,
+          'driverID': _selectedDriverID,
+        },
+      );
 
       // Walang schedule/request na i-a-update dito — bagong emergency case ito.
 

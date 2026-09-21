@@ -1,9 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../constants/app_colors.dart';
 import '../../services/auth_service.dart';
+import '../../services/call_log_service.dart';
+import '../../services/activity_log_service.dart';
 import '../../widgets/design_system.dart';
 import '../profile.dart';
 import 'pcr_form_screen.dart';
@@ -15,8 +16,18 @@ import 'in_app_map_screen.dart';
 // =====================================================
 
 const _monthNames = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 const _weekdayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -45,14 +56,25 @@ class ResponderDashboard extends StatefulWidget {
 
 class _ResponderDashboardState extends State<ResponderDashboard>
     with SingleTickerProviderStateMixin {
-  static const _nativeActions = MethodChannel('rescue35/native_actions');
   late final AnimationController _pulseController;
   int _selectedIndex = 0;
 
   static const _navItems = [
-    _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Dispatch'),
-    _NavItem(icon: Icons.qr_code_scanner_outlined, activeIcon: Icons.qr_code_scanner_rounded, label: 'PCR'),
-    _NavItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Profile'),
+    _NavItem(
+      icon: Icons.home_outlined,
+      activeIcon: Icons.home_rounded,
+      label: 'Dispatch',
+    ),
+    _NavItem(
+      icon: Icons.qr_code_scanner_outlined,
+      activeIcon: Icons.qr_code_scanner_rounded,
+      label: 'PCR',
+    ),
+    _NavItem(
+      icon: Icons.person_outline_rounded,
+      activeIcon: Icons.person_rounded,
+      label: 'Profile',
+    ),
   ];
 
   void _goToTab(int index) => setState(() => _selectedIndex = index);
@@ -75,10 +97,7 @@ class _ResponderDashboardState extends State<ResponderDashboard>
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              AppColors.primary.withValues(alpha: 0.08),
-              Colors.white,
-            ],
+            colors: [AppColors.primary.withValues(alpha: 0.08), Colors.white],
           ),
         ),
         child: IndexedStack(
@@ -90,9 +109,7 @@ class _ResponderDashboardState extends State<ResponderDashboard>
               acceptDispatch: _acceptDispatch,
               openPcr: _openPcrForDoc,
             ),
-            _PcrTab(
-              openEmergencyPcr: _openEmergencyPcr,
-            ),
+            _PcrTab(openEmergencyPcr: _openEmergencyPcr),
             const ProfileScreen(role: 'responder'),
           ],
         ),
@@ -140,17 +157,22 @@ class _ResponderDashboardState extends State<ResponderDashboard>
 
     return _DispatchDetails(
       requestData: requestData,
-      location: requestData['location'] ?? scheduleData['pickUpLocation'] ?? '-',
-      description: requestData['description'] ?? scheduleData['description'] ?? '-',
-      destinationHospital: requestData['destinationHospital'] ??
+      location:
+          requestData['location'] ?? scheduleData['pickUpLocation'] ?? '-',
+      description:
+          requestData['description'] ?? scheduleData['description'] ?? '-',
+      destinationHospital:
+          requestData['destinationHospital'] ??
           scheduleData['destinationHospital'] ??
           '-',
-      patientName: scheduleData['patientName'] ??
+      patientName:
+          scheduleData['patientName'] ??
           patientData['patientName'] ??
           patientData['patientname'] ??
           requestData['patientName'] ??
           'Patient',
-      contactNumber: patientData['contactNumber'] ?? requestData['contactNumber'] ?? '-',
+      contactNumber:
+          patientData['contactNumber'] ?? requestData['contactNumber'] ?? '-',
     );
   }
 
@@ -171,11 +193,13 @@ class _ResponderDashboardState extends State<ResponderDashboard>
     // completed). Anything further out is view-only for now.
     final scheduleDt = _parseScheduleDate(scheduleData['scheduleDate']);
     final now = DateTime.now();
-    final isScheduledToday = scheduleDt != null &&
+    final isScheduledToday =
+        scheduleDt != null &&
         scheduleDt.year == now.year &&
         scheduleDt.month == now.month &&
         scheduleDt.day == now.day;
-    final canAct = isScheduledToday || status == 'in-transit' || status == 'completed';
+    final canAct =
+        isScheduledToday || status == 'in-transit' || status == 'completed';
 
     showModalBottomSheet<void>(
       context: context,
@@ -227,9 +251,15 @@ class _ResponderDashboardState extends State<ResponderDashboard>
                     icon: Icons.phone_outlined,
                     label: 'Contact',
                     value: details.contactNumber,
+                    // ✅ Itinatala sa call_logs kasama ang pangalan ng
+                    // pasyente at ang requestID
                     onTap: details.contactNumber == '-'
                         ? null
-                        : () => _callNumber(details.contactNumber),
+                        : () => _callNumber(
+                            details.contactNumber,
+                            calleeName: details.patientName,
+                            requestId: scheduleData['requestID']?.toString(),
+                          ),
                   ),
                   _detailActionLine(
                     icon: Icons.location_on_outlined,
@@ -251,12 +281,16 @@ class _ResponderDashboardState extends State<ResponderDashboard>
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: AppColors.accent,
                                 side: const BorderSide(color: AppColors.accent),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              icon: const Icon(Icons.directions_car_filled_outlined),
+                              icon: const Icon(
+                                Icons.directions_car_filled_outlined,
+                              ),
                               label: const Text('En Route'),
                               onPressed: () async {
                                 await _acceptDispatch(context, doc);
@@ -290,21 +324,32 @@ class _ResponderDashboardState extends State<ResponderDashboard>
                     // open the map.
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 14,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.textGray.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.visibility_outlined, size: 18, color: AppColors.textGray),
+                          const Icon(
+                            Icons.visibility_outlined,
+                            size: 18,
+                            color: AppColors.textGray,
+                          ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               scheduleDt != null
                                   ? 'View only for now — En Route and PCR unlock on ${_monthNames[scheduleDt.month - 1]} ${scheduleDt.day}.'
                                   : 'View only for now — actions unlock on the scheduled day.',
-                              style: const TextStyle(color: AppColors.textGray, fontWeight: FontWeight.w700, fontSize: 12.5),
+                              style: const TextStyle(
+                                color: AppColors.textGray,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12.5,
+                              ),
                             ),
                           ),
                         ],
@@ -425,12 +470,22 @@ class _ResponderDashboardState extends State<ResponderDashboard>
 
     if (requestID != null && requestID.isNotEmpty) {
       batch.update(
-        FirebaseFirestore.instance.collection('transport_requests').doc(requestID),
+        FirebaseFirestore.instance
+            .collection('transport_requests')
+            .doc(requestID),
         {'status': 'in-transit'},
       );
     }
 
     await batch.commit();
+    await ActivityLogService.log(
+      action: 'dispatch_en_route',
+      description:
+          'Marked dispatch as en route${patientName == null || patientName.isEmpty ? '' : ' for $patientName'}.',
+      entityType: 'transport_schedule',
+      entityId: doc.id,
+      metadata: {'requestID': requestID ?? ''},
+    );
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('En Route — Dispatch accepted.')),
@@ -458,7 +513,8 @@ class _ResponderDashboardState extends State<ResponderDashboard>
           scheduleData: scheduleData,
           requestData: {
             ...?details?.requestData,
-            'requestID': scheduleData['requestID'] ?? details?.requestData['requestID'],
+            'requestID':
+                scheduleData['requestID'] ?? details?.requestData['requestID'],
             'patientName': details?.patientName,
           },
         ),
@@ -478,11 +534,27 @@ class _ResponderDashboardState extends State<ResponderDashboard>
     _openPcr(context, doc, details);
   }
 
-  Future<void> _callNumber(String number) async {
-    await _nativeActions.invokeMethod<void>('dial', {'number': number});
+  // ✅ Itinatala na sa call_logs bago buksan ang dialer
+  Future<void> _callNumber(
+    String number, {
+    String calleeName = '',
+    String? requestId,
+  }) async {
+    await CallLogService.callAndLog(
+      calleeNumber: number,
+      calleeName: calleeName,
+      calleeRole: 'citizen',
+      relatedRequestId: requestId,
+    );
   }
 
   void _openMap(String address) {
+    ActivityLogService.log(
+      action: 'map_opened',
+      description: 'Opened pickup location in the map.',
+      entityType: 'location',
+      metadata: {'address': address},
+    );
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -490,7 +562,6 @@ class _ResponderDashboardState extends State<ResponderDashboard>
       ),
     );
   }
-
 }
 
 // =====================================================
@@ -516,7 +587,11 @@ class _DispatchDetails {
 }
 
 class _NavItem {
-  const _NavItem({required this.icon, required this.activeIcon, required this.label});
+  const _NavItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+  });
   final IconData icon;
   final IconData activeIcon;
   final String label;
@@ -585,15 +660,20 @@ class _DispatchTab extends StatelessWidget {
     required this.openPcr,
   });
   final AnimationController pulseController;
-  final Future<void> Function(BuildContext, QueryDocumentSnapshot) showDispatchDetails;
-  final Future<void> Function(BuildContext, QueryDocumentSnapshot) acceptDispatch;
+  final Future<void> Function(BuildContext, QueryDocumentSnapshot)
+  showDispatchDetails;
+  final Future<void> Function(BuildContext, QueryDocumentSnapshot)
+  acceptDispatch;
   final Future<void> Function(BuildContext, QueryDocumentSnapshot) openPcr;
 
   @override
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .snapshots(),
       builder: (context, userSnap) {
         final userData = userSnap.data?.data() as Map<String, dynamic>?;
         final name = userData?['name'] ?? 'Responder';
@@ -685,8 +765,10 @@ class _DispatchBody extends StatelessWidget {
   });
   final String uid;
   final AnimationController pulseController;
-  final Future<void> Function(BuildContext, QueryDocumentSnapshot) showDispatchDetails;
-  final Future<void> Function(BuildContext, QueryDocumentSnapshot) acceptDispatch;
+  final Future<void> Function(BuildContext, QueryDocumentSnapshot)
+  showDispatchDetails;
+  final Future<void> Function(BuildContext, QueryDocumentSnapshot)
+  acceptDispatch;
   final Future<void> Function(BuildContext, QueryDocumentSnapshot) openPcr;
 
   @override
@@ -713,7 +795,8 @@ class _DispatchBody extends StatelessWidget {
           );
         }
 
-        final docs = [...?snap.data?.docs]..sort((a, b) {
+        final docs = [...?snap.data?.docs]
+          ..sort((a, b) {
             final aData = a.data() as Map<String, dynamic>;
             final bData = b.data() as Map<String, dynamic>;
             int getMillis(d) {
@@ -721,6 +804,7 @@ class _DispatchBody extends StatelessWidget {
               final parsed = _parseScheduleDate(v);
               return parsed?.millisecondsSinceEpoch ?? 0;
             }
+
             return getMillis(aData).compareTo(getMillis(bData));
           });
 
@@ -733,7 +817,9 @@ class _DispatchBody extends StatelessWidget {
           final sd = _parseScheduleDate(data['scheduleDate']);
           if (sd == null) return false;
           final now = DateTime.now();
-          return sd.year == now.year && sd.month == now.month && sd.day == now.day;
+          return sd.year == now.year &&
+              sd.month == now.month &&
+              sd.day == now.day;
         }
 
         final todaySchedules = <QueryDocumentSnapshot>[];
@@ -783,7 +869,10 @@ class _DispatchBody extends StatelessWidget {
                             // the explicit "En Route" button.
                             onTap: assigned.isEmpty
                                 ? null
-                                : () => showDispatchDetails(context, assigned.first),
+                                : () => showDispatchDetails(
+                                    context,
+                                    assigned.first,
+                                  ),
                           ),
                         ),
                       ),
@@ -799,7 +888,10 @@ class _DispatchBody extends StatelessWidget {
                             onTap: () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => const PCRStandaloneFormScreen()),
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const PCRStandaloneFormScreen(),
+                                ),
                               );
                             },
                           ),
@@ -812,7 +904,9 @@ class _DispatchBody extends StatelessWidget {
                   // when it's the odd one out.
                   _DashboardCard(
                     label: 'Notifications',
-                    value: assigned.isEmpty ? 'Clear' : '${assigned.length} new',
+                    value: assigned.isEmpty
+                        ? 'Clear'
+                        : '${assigned.length} new',
                     icon: Icons.notifications_active_outlined,
                     color: AppColors.warning,
                     wide: true,
@@ -827,7 +921,11 @@ class _DispatchBody extends StatelessWidget {
                 const SizedBox(width: 10),
                 const Text(
                   "Today's Schedule",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.dark),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.dark,
+                  ),
                 ),
               ],
             ),
@@ -837,22 +935,40 @@ class _DispatchBody extends StatelessWidget {
                 radius: 16,
                 child: Padding(
                   padding: EdgeInsets.symmetric(vertical: 22),
-                  child: Center(child: Text('No dispatch scheduled today.', style: TextStyle(color: AppColors.textGray))),
+                  child: Center(
+                    child: Text(
+                      'No dispatch scheduled today.',
+                      style: TextStyle(color: AppColors.textGray),
+                    ),
+                  ),
                 ),
               )
             else
-              ...todaySchedules.map((doc) => _DispatchCard(
-                    doc: doc,
-                    showDispatchDetails: showDispatchDetails,
-                    acceptDispatch: acceptDispatch,
-                    openPcr: openPcr,
-                  )),
+              ...todaySchedules.map(
+                (doc) => _DispatchCard(
+                  doc: doc,
+                  showDispatchDetails: showDispatchDetails,
+                  acceptDispatch: acceptDispatch,
+                  openPcr: openPcr,
+                ),
+              ),
             const SizedBox(height: 26),
             const Row(
               children: [
-                Icon(Icons.event_note_outlined, size: 20, color: AppColors.textGray),
+                Icon(
+                  Icons.event_note_outlined,
+                  size: 20,
+                  color: AppColors.textGray,
+                ),
                 SizedBox(width: 10),
-                Text('Other Schedules', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.dark)),
+                Text(
+                  'Other Schedules',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.dark,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -861,7 +977,12 @@ class _DispatchBody extends StatelessWidget {
                 radius: 16,
                 child: Padding(
                   padding: EdgeInsets.symmetric(vertical: 22),
-                  child: Center(child: Text('No other schedules.', style: TextStyle(color: AppColors.textGray))),
+                  child: Center(
+                    child: Text(
+                      'No other schedules.',
+                      style: TextStyle(color: AppColors.textGray),
+                    ),
+                  ),
                 ),
               )
             else
@@ -905,21 +1026,44 @@ class _DashboardCard extends StatelessWidget {
             color: Colors.white,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: AppColors.border),
-            boxShadow: [BoxShadow(color: AppColors.dark.withValues(alpha: 0.06), blurRadius: 18, offset: const Offset(0, 10))],
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.dark.withValues(alpha: 0.06),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
           child: wide
               ? Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(9),
-                      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       child: Icon(icon, color: color, size: 20),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Text(label, style: const TextStyle(color: AppColors.textGray, fontSize: 11.5, fontWeight: FontWeight.w800)),
+                      child: Text(
+                        label,
+                        style: const TextStyle(
+                          color: AppColors.textGray,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     ),
-                    Text(value, style: const TextStyle(color: AppColors.dark, fontSize: 17, fontWeight: FontWeight.w900)),
+                    Text(
+                      value,
+                      style: const TextStyle(
+                        color: AppColors.dark,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                   ],
                 )
               : Column(
@@ -928,13 +1072,37 @@ class _DashboardCard extends StatelessWidget {
                   children: [
                     Container(
                       padding: const EdgeInsets.all(9),
-                      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       child: Icon(icon, color: color, size: 20),
                     ),
                     const SizedBox(height: 10),
-                    FittedBox(fit: BoxFit.scaleDown, child: Text(value, style: const TextStyle(color: AppColors.dark, fontSize: 19, fontWeight: FontWeight.w900))),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        value,
+                        style: const TextStyle(
+                          color: AppColors.dark,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Flexible(child: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textGray, fontSize: 11.5, fontWeight: FontWeight.w800))),
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textGray,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
         ),
@@ -964,10 +1132,24 @@ class _LivePulse extends StatelessWidget {
                 scale: scale,
                 child: Opacity(
                   opacity: opacity,
-                  child: Container(width: 14, height: 14, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.26), shape: BoxShape.circle)),
+                  child: Container(
+                    width: 14,
+                    height: 14,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.26),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
                 ),
               ),
-              Container(width: 10, height: 10, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
+              Container(
+                width: 10,
+                height: 10,
+                decoration: const BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                ),
+              ),
             ],
           ),
         );
@@ -984,8 +1166,10 @@ class _DispatchCard extends StatelessWidget {
     required this.openPcr,
   });
   final QueryDocumentSnapshot doc;
-  final Future<void> Function(BuildContext, QueryDocumentSnapshot) showDispatchDetails;
-  final Future<void> Function(BuildContext, QueryDocumentSnapshot) acceptDispatch;
+  final Future<void> Function(BuildContext, QueryDocumentSnapshot)
+  showDispatchDetails;
+  final Future<void> Function(BuildContext, QueryDocumentSnapshot)
+  acceptDispatch;
   final Future<void> Function(BuildContext, QueryDocumentSnapshot) openPcr;
 
   @override
@@ -1018,12 +1202,20 @@ class _DispatchCard extends StatelessWidget {
                     children: [
                       Text(
                         data['patientName'] ?? 'Patient',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.dark),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.dark,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         data['trackingNumber'] ?? data['requestID'] ?? doc.id,
-                        style: const TextStyle(fontSize: 12, color: AppColors.textGray, fontWeight: FontWeight.w700),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textGray,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ],
                   ),
@@ -1038,7 +1230,11 @@ class _DispatchCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.location_on_outlined, size: 16, color: AppColors.secondary),
+                const Icon(
+                  Icons.location_on_outlined,
+                  size: 16,
+                  color: AppColors.secondary,
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -1061,9 +1257,14 @@ class _DispatchCard extends StatelessWidget {
                         foregroundColor: AppColors.accent,
                         side: const BorderSide(color: AppColors.accent),
                         padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
-                      icon: const Icon(Icons.directions_car_filled_outlined, size: 18),
+                      icon: const Icon(
+                        Icons.directions_car_filled_outlined,
+                        size: 18,
+                      ),
                       label: const Text('En Route'),
                       onPressed: () => acceptDispatch(context, doc),
                     ),
@@ -1074,7 +1275,9 @@ class _DispatchCard extends StatelessWidget {
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                     icon: const Icon(Icons.document_scanner_outlined, size: 18),
                     label: const Text('Scan PCR'),
@@ -1101,13 +1304,16 @@ class _OtherSchedulesCalendarList extends StatefulWidget {
   });
 
   final List<QueryDocumentSnapshot> schedules;
-  final Future<void> Function(BuildContext, QueryDocumentSnapshot) showDispatchDetails;
+  final Future<void> Function(BuildContext, QueryDocumentSnapshot)
+  showDispatchDetails;
 
   @override
-  State<_OtherSchedulesCalendarList> createState() => _OtherSchedulesCalendarListState();
+  State<_OtherSchedulesCalendarList> createState() =>
+      _OtherSchedulesCalendarListState();
 }
 
-class _OtherSchedulesCalendarListState extends State<_OtherSchedulesCalendarList> {
+class _OtherSchedulesCalendarListState
+    extends State<_OtherSchedulesCalendarList> {
   late DateTime _displayedMonth;
   late DateTime _selectedDate;
 
@@ -1119,8 +1325,12 @@ class _OtherSchedulesCalendarListState extends State<_OtherSchedulesCalendarList
     // Land on today's month if there's an entry there, otherwise the
     // month of the earliest "other" schedule.
     final now = DateTime.now();
-    final hasCurrentMonth = sortedDates.any((d) => d.year == now.year && d.month == now.month);
-    final anchor = hasCurrentMonth || sortedDates.isEmpty ? now : sortedDates.first;
+    final hasCurrentMonth = sortedDates.any(
+      (d) => d.year == now.year && d.month == now.month,
+    );
+    final anchor = hasCurrentMonth || sortedDates.isEmpty
+        ? now
+        : sortedDates.first;
     _displayedMonth = DateTime(anchor.year, anchor.month, 1);
     _selectedDate = sortedDates.isEmpty ? now : sortedDates.first;
   }
@@ -1138,15 +1348,27 @@ class _OtherSchedulesCalendarListState extends State<_OtherSchedulesCalendarList
 
   void _changeMonth(int delta) {
     setState(() {
-      _displayedMonth = DateTime(_displayedMonth.year, _displayedMonth.month + delta, 1);
+      _displayedMonth = DateTime(
+        _displayedMonth.year,
+        _displayedMonth.month + delta,
+        1,
+      );
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final byDate = _groupByDate();
-    final daysInMonth = DateTime(_displayedMonth.year, _displayedMonth.month + 1, 0).day;
-    final firstWeekday = DateTime(_displayedMonth.year, _displayedMonth.month, 1).weekday; // 1=Mon..7=Sun
+    final daysInMonth = DateTime(
+      _displayedMonth.year,
+      _displayedMonth.month + 1,
+      0,
+    ).day;
+    final firstWeekday = DateTime(
+      _displayedMonth.year,
+      _displayedMonth.month,
+      1,
+    ).weekday; // 1=Mon..7=Sun
     final leadingBlanks = firstWeekday - 1;
     final totalCells = ((leadingBlanks + daysInMonth) / 7).ceil() * 7;
 
@@ -1158,7 +1380,13 @@ class _OtherSchedulesCalendarListState extends State<_OtherSchedulesCalendarList
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
-        boxShadow: [BoxShadow(color: AppColors.dark.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 6))],
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.dark.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1169,19 +1397,29 @@ class _OtherSchedulesCalendarListState extends State<_OtherSchedulesCalendarList
             children: [
               IconButton(
                 visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.chevron_left_rounded, color: AppColors.textGray),
+                icon: const Icon(
+                  Icons.chevron_left_rounded,
+                  color: AppColors.textGray,
+                ),
                 onPressed: () => _changeMonth(-1),
               ),
               Expanded(
                 child: Text(
                   '${_fullMonthName(_displayedMonth.month)} ${_displayedMonth.year}',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.dark),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.dark,
+                  ),
                 ),
               ),
               IconButton(
                 visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.chevron_right_rounded, color: AppColors.textGray),
+                icon: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.textGray,
+                ),
                 onPressed: () => _changeMonth(1),
               ),
             ],
@@ -1193,7 +1431,14 @@ class _OtherSchedulesCalendarListState extends State<_OtherSchedulesCalendarList
               for (final w in _weekdayNames)
                 Expanded(
                   child: Center(
-                    child: Text(w.substring(0, 2), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.textGray)),
+                    child: Text(
+                      w.substring(0, 2),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textGray,
+                      ),
+                    ),
                   ),
                 ),
             ],
@@ -1215,16 +1460,24 @@ class _OtherSchedulesCalendarListState extends State<_OtherSchedulesCalendarList
               if (dayNum < 1 || dayNum > daysInMonth) {
                 return const SizedBox.shrink();
               }
-              final cellDate = DateTime(_displayedMonth.year, _displayedMonth.month, dayNum);
+              final cellDate = DateTime(
+                _displayedMonth.year,
+                _displayedMonth.month,
+                dayNum,
+              );
               final docsForDay = byDate[cellDate] ?? const [];
               final isSelected = cellDate == _selectedDate;
-              final isToday = cellDate.year == DateTime.now().year &&
+              final isToday =
+                  cellDate.year == DateTime.now().year &&
                   cellDate.month == DateTime.now().month &&
                   cellDate.day == DateTime.now().day;
 
               Color? dotColor;
               if (docsForDay.isNotEmpty) {
-                final firstStatus = (docsForDay.first.data() as Map<String, dynamic>)['status'] ?? 'approved';
+                final firstStatus =
+                    (docsForDay.first.data()
+                        as Map<String, dynamic>)['status'] ??
+                    'approved';
                 dotColor = _statusColor(firstStatus);
               }
 
@@ -1245,20 +1498,30 @@ class _OtherSchedulesCalendarListState extends State<_OtherSchedulesCalendarList
           const SizedBox(height: 12),
           Text(
             '${_weekdayNames[_selectedDate.weekday - 1]}, ${_monthNames[_selectedDate.month - 1]} ${_selectedDate.day}',
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.dark),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+              color: AppColors.dark,
+            ),
           ),
           const SizedBox(height: 10),
           if (selectedDocs.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 10),
-              child: Text('No dispatch on this date.', style: TextStyle(color: AppColors.textGray)),
+              child: Text(
+                'No dispatch on this date.',
+                style: TextStyle(color: AppColors.textGray),
+              ),
             )
           else
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 for (var i = 0; i < selectedDocs.length; i++) ...[
-                  _TodoRow(doc: selectedDocs[i], showDispatchDetails: widget.showDispatchDetails),
+                  _TodoRow(
+                    doc: selectedDocs[i],
+                    showDispatchDetails: widget.showDispatchDetails,
+                  ),
                   if (i != selectedDocs.length - 1)
                     const Divider(height: 1, color: AppColors.border),
                 ],
@@ -1272,8 +1535,18 @@ class _OtherSchedulesCalendarListState extends State<_OtherSchedulesCalendarList
 
 String _fullMonthName(int month) {
   const names = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
   return names[month - 1];
 }
@@ -1301,8 +1574,8 @@ class _MonthDayCell extends StatelessWidget {
     final bg = isSelected
         ? AppColors.primary
         : hasSchedule
-            ? AppColors.primary.withValues(alpha: 0.08)
-            : Colors.transparent;
+        ? AppColors.primary.withValues(alpha: 0.08)
+        : Colors.transparent;
     final textColor = isSelected ? Colors.white : AppColors.dark;
 
     return InkWell(
@@ -1312,7 +1585,9 @@ class _MonthDayCell extends StatelessWidget {
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(10),
-          border: isToday && !isSelected ? Border.all(color: AppColors.primary, width: 1.2) : null,
+          border: isToday && !isSelected
+              ? Border.all(color: AppColors.primary, width: 1.2)
+              : null,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1320,9 +1595,13 @@ class _MonthDayCell extends StatelessWidget {
             Text(
               '$dayNum',
               style: TextStyle(
-                color: hasSchedule || isSelected ? textColor : AppColors.textGray,
+                color: hasSchedule || isSelected
+                    ? textColor
+                    : AppColors.textGray,
                 fontSize: 13,
-                fontWeight: hasSchedule || isSelected ? FontWeight.w900 : FontWeight.w600,
+                fontWeight: hasSchedule || isSelected
+                    ? FontWeight.w900
+                    : FontWeight.w600,
               ),
             ),
             if (hasSchedule) ...[
@@ -1346,7 +1625,8 @@ class _MonthDayCell extends StatelessWidget {
 class _TodoRow extends StatelessWidget {
   const _TodoRow({required this.doc, required this.showDispatchDetails});
   final QueryDocumentSnapshot doc;
-  final Future<void> Function(BuildContext, QueryDocumentSnapshot) showDispatchDetails;
+  final Future<void> Function(BuildContext, QueryDocumentSnapshot)
+  showDispatchDetails;
 
   @override
   Widget build(BuildContext context) {
@@ -1382,14 +1662,22 @@ class _TodoRow extends StatelessWidget {
                           data['patientName'] ?? 'Patient',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: AppColors.dark),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.dark,
+                          ),
                         ),
                       ),
                       if (scheduleDt != null) ...[
                         const SizedBox(width: 6),
                         Text(
                           _formatTime(scheduleDt),
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textGray),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textGray,
+                          ),
                         ),
                       ],
                     ],
@@ -1399,13 +1687,21 @@ class _TodoRow extends StatelessWidget {
                     address,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, color: AppColors.textGray, fontWeight: FontWeight.w700),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textGray,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 6),
-            const Icon(Icons.chevron_right, color: AppColors.textLight, size: 20),
+            const Icon(
+              Icons.chevron_right,
+              color: AppColors.textLight,
+              size: 20,
+            ),
           ],
         ),
       ),
@@ -1434,13 +1730,31 @@ class _PcrTab extends StatelessWidget {
               Container(
                 width: 120,
                 height: 120,
-                decoration: BoxDecoration(color: AppColors.secondary.withValues(alpha: 0.12), shape: BoxShape.circle),
-                child: const Icon(Icons.document_scanner_rounded, color: AppColors.secondary, size: 56),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.document_scanner_rounded,
+                  color: AppColors.secondary,
+                  size: 56,
+                ),
               ),
               const SizedBox(height: 24),
-              const Text('Patient Care Report', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.dark)),
+              const Text(
+                'Patient Care Report',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.dark,
+                ),
+              ),
               const SizedBox(height: 8),
-              const Text('Start an emergency PCR or select from dispatch', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textGray, fontSize: 13)),
+              const Text(
+                'Start an emergency PCR or select from dispatch',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textGray, fontSize: 13),
+              ),
               const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
@@ -1448,10 +1762,15 @@ class _PcrTab extends StatelessWidget {
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.secondary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
                   icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
-                  label: const Text('Start Emergency PCR', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                  label: const Text(
+                    'Start Emergency PCR',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                  ),
                   onPressed: () => openEmergencyPcr(context),
                 ),
               ),
@@ -1468,7 +1787,11 @@ class _PcrTab extends StatelessWidget {
 // =====================================================
 
 class _FloatingNavBar extends StatelessWidget {
-  const _FloatingNavBar({required this.items, required this.selectedIndex, required this.onTap});
+  const _FloatingNavBar({
+    required this.items,
+    required this.selectedIndex,
+    required this.onTap,
+  });
   final List<_NavItem> items;
   final int selectedIndex;
   final ValueChanged<int> onTap;
@@ -1479,7 +1802,17 @@ class _FloatingNavBar extends StatelessWidget {
       child: Container(
         height: 70,
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, 4))]),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
         child: Row(
           children: List.generate(items.length, (index) {
             final item = items[index];
@@ -1490,13 +1823,35 @@ class _FloatingNavBar extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(color: selected ? AppColors.primary.withValues(alpha: 0.12) : Colors.transparent, borderRadius: BorderRadius.circular(16)),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? AppColors.primary.withValues(alpha: 0.12)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(selected ? item.activeIcon : item.icon, color: selected ? AppColors.primary : AppColors.textGray, size: 24),
+                      Icon(
+                        selected ? item.activeIcon : item.icon,
+                        color: selected
+                            ? AppColors.primary
+                            : AppColors.textGray,
+                        size: 24,
+                      ),
                       const SizedBox(height: 2),
-                      Text(item.label, style: TextStyle(fontSize: 11, fontWeight: selected ? FontWeight.bold : FontWeight.normal, color: selected ? AppColors.primary : AppColors.textGray)),
+                      Text(
+                        item.label,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: selected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.textGray,
+                        ),
+                      ),
                     ],
                   ),
                 ),

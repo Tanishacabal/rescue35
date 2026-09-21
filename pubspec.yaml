@@ -38,6 +38,7 @@ dependencies:
   cloud_firestore: ^5.4.0
   firebase_storage: ^12.3.0
   firebase_messaging: ^15.1.0
+  url_launcher: ^6.3.0
 
   # OCR para sa PCR form
   google_mlkit_text_recognition: ^0.13.0

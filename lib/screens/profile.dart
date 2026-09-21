@@ -7,13 +7,11 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_colors.dart';
 import '../widgets/design_system.dart';
+import '../services/activity_log_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String role;
-  const ProfileScreen({
-    super.key,
-    this.role = 'citizen',
-  });
+  const ProfileScreen({super.key, this.role = 'citizen'});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -80,6 +78,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (picked != null) {
         final savedFile = await _savePhotoLocally(picked.path);
         if (mounted) setState(() => _pickedPhoto = savedFile);
+        await ActivityLogService.log(
+          action: 'profile_photo_updated',
+          description: 'Updated profile photo.',
+          entityType: 'user',
+          entityId: _uid,
+        );
       }
     } catch (e) {
       if (!mounted) return;
@@ -120,6 +124,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await prefs.remove(_photoPrefsKey);
     }
     if (mounted) setState(() => _pickedPhoto = null);
+    await ActivityLogService.log(
+      action: 'profile_photo_removed',
+      description: 'Removed profile photo.',
+      entityType: 'user',
+      entityId: _uid,
+    );
   }
 
   void _showPhotoSourceSheet() {
@@ -143,7 +153,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 8),
                 ListTile(
-                  leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
+                  leading: const Icon(
+                    Icons.photo_library_outlined,
+                    color: AppColors.primary,
+                  ),
                   title: const Text('Choose from Gallery'),
                   onTap: () {
                     Navigator.pop(context);
@@ -151,7 +164,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.photo_camera_outlined, color: AppColors.primary),
+                  leading: const Icon(
+                    Icons.photo_camera_outlined,
+                    color: AppColors.primary,
+                  ),
                   title: const Text('Take a Photo'),
                   onTap: () {
                     Navigator.pop(context);
@@ -160,8 +176,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 if (_pickedPhoto != null)
                   ListTile(
-                    leading: const Icon(Icons.delete_outline, color: AppColors.warning),
-                    title: const Text('Remove Photo', style: TextStyle(color: AppColors.warning)),
+                    leading: const Icon(
+                      Icons.delete_outline,
+                      color: AppColors.warning,
+                    ),
+                    title: const Text(
+                      'Remove Photo',
+                      style: TextStyle(color: AppColors.warning),
+                    ),
                     onTap: () {
                       Navigator.pop(context);
                       _removePhoto();
@@ -181,13 +203,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// from here, only shown as a read-only detail row on the main screen.
   void _showEditProfileSheet(Map<String, dynamic> data) {
     final nameCtrl = TextEditingController(
-      text: (data['name'] ?? data['fullname'] ?? data['responder_name'] ?? '').toString(),
+      text: (data['name'] ?? data['fullname'] ?? data['responder_name'] ?? '')
+          .toString(),
     );
-    final contactCtrl = TextEditingController(text: (data['contactNumber'] ?? '').toString());
-    final barangayCtrl = TextEditingController(text: (data['barangay'] ?? '').toString());
-    final municipalityCtrl =
-        TextEditingController(text: (data['municipality'] ?? 'Lal-lo').toString());
-    final provinceCtrl = TextEditingController(text: (data['province'] ?? 'Cagayan').toString());
+    final contactCtrl = TextEditingController(
+      text: (data['contactNumber'] ?? '').toString(),
+    );
+    final barangayCtrl = TextEditingController(
+      text: (data['barangay'] ?? '').toString(),
+    );
+    final municipalityCtrl = TextEditingController(
+      text: (data['municipality'] ?? 'Lal-lo').toString(),
+    );
+    final provinceCtrl = TextEditingController(
+      text: (data['province'] ?? 'Cagayan').toString(),
+    );
     final formKey = GlobalKey<FormState>();
     final isCitizen = widget.role == 'citizen';
 
@@ -228,21 +258,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(height: 4),
                       const Text(
                         'Hindi puwedeng baguhin ang email address dito.',
-                        style: TextStyle(color: AppColors.textGray, fontSize: 12),
+                        style: TextStyle(
+                          color: AppColors.textGray,
+                          fontSize: 12,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: nameCtrl,
                         textCapitalization: TextCapitalization.words,
-                        decoration: rescueInputDecoration('Full Name', Icons.badge_outlined),
-                        validator: (v) =>
-                            (v == null || v.trim().length < 2) ? 'Enter your full name' : null,
+                        decoration: rescueInputDecoration(
+                          'Full Name',
+                          Icons.badge_outlined,
+                        ),
+                        validator: (v) => (v == null || v.trim().length < 2)
+                            ? 'Enter your full name'
+                            : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: contactCtrl,
                         keyboardType: TextInputType.phone,
-                        decoration: rescueInputDecoration('Mobile Number', Icons.phone_outlined),
+                        decoration: rescueInputDecoration(
+                          'Mobile Number',
+                          Icons.phone_outlined,
+                        ),
                         validator: (v) {
                           final text = (v ?? '').trim();
                           if (text.isEmpty) return 'Mobile number is required';
@@ -253,21 +293,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: barangayCtrl,
-                          decoration:
-                              rescueInputDecoration('Barangay', Icons.location_city_outlined),
-                          validator: (v) =>
-                              (v == null || v.trim().isEmpty) ? 'Barangay is required' : null,
+                          decoration: rescueInputDecoration(
+                            'Barangay',
+                            Icons.location_city_outlined,
+                          ),
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'Barangay is required'
+                              : null,
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: municipalityCtrl,
                           decoration: rescueInputDecoration(
-                              'Municipality / City', Icons.business_outlined),
+                            'Municipality / City',
+                            Icons.business_outlined,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: provinceCtrl,
-                          decoration: rescueInputDecoration('Province', Icons.map_outlined),
+                          decoration: rescueInputDecoration(
+                            'Province',
+                            Icons.map_outlined,
+                          ),
                         ),
                       ],
                       const SizedBox(height: 20),
@@ -287,16 +335,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       name: nameCtrl.text.trim(),
                                       contactNumber: contactCtrl.text.trim(),
                                       barangay: barangayCtrl.text.trim(),
-                                      municipality: municipalityCtrl.text.trim(),
+                                      municipality: municipalityCtrl.text
+                                          .trim(),
                                       province: provinceCtrl.text.trim(),
                                     );
-                                    if (sheetContext.mounted) Navigator.pop(sheetContext);
+                                    if (sheetContext.mounted) {
+                                      Navigator.pop(sheetContext);
+                                    }
                                     _refreshProfile();
                                   } catch (e) {
                                     setSheetState(() => isSaving = false);
                                     if (!mounted) return;
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Unable to save: $e')),
+                                      SnackBar(
+                                        content: Text('Unable to save: $e'),
+                                      ),
                                     );
                                   }
                                 },
@@ -325,13 +378,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }) async {
     final uid = _uid;
 
-    await FirebaseFirestore.instance.collection('users').doc(uid).set(
-      {
-        'fullName': name,
-        'phoneNumber': contactNumber,
-      },
-      SetOptions(merge: true),
-    );
+    await FirebaseFirestore.instance.collection('users').doc(uid).set({
+      'fullName': name,
+      'phoneNumber': contactNumber,
+    }, SetOptions(merge: true));
 
     if (_roleDocRef != null) {
       final roleUpdate = <String, dynamic>{
@@ -345,6 +395,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
       await _roleDocRef!.set(roleUpdate, SetOptions(merge: true));
     }
+    await ActivityLogService.log(
+      action: 'profile_updated',
+      description: 'Updated profile information.',
+      entityType: 'user',
+      entityId: uid,
+      metadata: {'role': widget.role},
+    );
   }
 
   @override
@@ -365,22 +422,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: FutureBuilder<Map<String, dynamic>>(
         future: _profileFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting || !_photoLoaded) {
+          if (snapshot.connectionState == ConnectionState.waiting ||
+              !_photoLoaded) {
             return const Center(
               child: CircularProgressIndicator(color: AppColors.primary),
             );
           }
           final data = snapshot.data ?? {};
 
-          final name = (data['name'] ?? data['fullname'] ?? data['responder_name'] ?? 'Profile').toString();
+          final name =
+              (data['name'] ??
+                      data['fullname'] ??
+                      data['responder_name'] ??
+                      'Profile')
+                  .toString();
           final email = (data['email'] ?? '-').toString();
           final contact = (data['contactNumber'] ?? '-').toString();
           final barangay = (data['barangay'] ?? '-').toString();
           final municipality = (data['municipality'] ?? 'Lal-lo').toString();
           final province = (data['province'] ?? 'Cagayan').toString();
-          final accountStatus = (data['accountStatus'] ?? data['verificationStatus'] ?? 'active').toString();
-          final roleLabel = widget.role == 'responder' ? 'Responder' : 'Citizen';
-          final isVerified = accountStatus != 'pending' && accountStatus != 'rejected';
+          final accountStatus =
+              (data['accountStatus'] ?? data['verificationStatus'] ?? 'active')
+                  .toString();
+          final roleLabel = widget.role == 'responder'
+              ? 'Responder'
+              : 'Citizen';
+          final isVerified =
+              accountStatus != 'pending' && accountStatus != 'rejected';
 
           return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
@@ -405,11 +473,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       _detailRow(Icons.badge_outlined, 'Full Name', name),
                       const SizedBox(height: 16),
-                      _detailRow(Icons.email_outlined, 'Email Address', email, locked: true),
+                      _detailRow(
+                        Icons.email_outlined,
+                        'Email Address',
+                        email,
+                        locked: true,
+                      ),
                       const SizedBox(height: 16),
-                      _detailRow(Icons.phone_outlined, 'Mobile Number', contact),
+                      _detailRow(
+                        Icons.phone_outlined,
+                        'Mobile Number',
+                        contact,
+                      ),
                       const SizedBox(height: 16),
-                      _detailRow(Icons.person_outline, 'Account Role', roleLabel),
+                      _detailRow(
+                        Icons.person_outline,
+                        'Account Role',
+                        roleLabel,
+                      ),
                     ],
                   ),
                 ),
@@ -423,9 +504,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     padding: const EdgeInsets.all(20),
                     child: Column(
                       children: [
-                        _detailRow(Icons.location_city_outlined, 'Barangay', barangay),
+                        _detailRow(
+                          Icons.location_city_outlined,
+                          'Barangay',
+                          barangay,
+                        ),
                         const SizedBox(height: 16),
-                        _detailRow(Icons.business_outlined, 'Municipality / City', municipality),
+                        _detailRow(
+                          Icons.business_outlined,
+                          'Municipality / City',
+                          municipality,
+                        ),
                         const SizedBox(height: 16),
                         _detailRow(Icons.map_outlined, 'Province', province),
                       ],
@@ -463,7 +552,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               isVerified
                                   ? Icons.verified_user_rounded
                                   : Icons.pending_actions_rounded,
-                              color: isVerified ? AppColors.completed : AppColors.warning,
+                              color: isVerified
+                                  ? AppColors.completed
+                                  : AppColors.warning,
                               size: 22,
                             ),
                             const SizedBox(width: 12),
@@ -473,7 +564,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     ? '✅ Your account is verified and fully active.'
                                     : '⏳ Your account is still under review.',
                                 style: TextStyle(
-                                  color: isVerified ? AppColors.completed : AppColors.warning,
+                                  color: isVerified
+                                      ? AppColors.completed
+                                      : AppColors.warning,
                                   fontWeight: FontWeight.w600,
                                   height: 1.5,
                                 ),
@@ -511,7 +604,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<Map<String, dynamic>> _loadProfileData(String uid, String role) async {
-    final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
     final userData = userDoc.data() ?? {};
     final collectionName = role == 'citizen' ? 'citizens' : 'responders';
     final roleSnap = await FirebaseFirestore.instance
@@ -557,7 +653,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(20),
@@ -574,17 +673,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 16),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.shield_outlined, color: Colors.white70, size: 18),
+                    const Icon(
+                      Icons.shield_outlined,
+                      color: Colors.white70,
+                      size: 18,
+                    ),
                     const SizedBox(width: 8),
                     Text(
-                      isVerified ? 'Account verified' : 'Verification in progress',
+                      isVerified
+                          ? 'Account verified'
+                          : 'Verification in progress',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 14,
@@ -607,7 +715,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onTap: onEditTap,
                 child: const Padding(
                   padding: EdgeInsets.all(9),
-                  child: Icon(Icons.edit_outlined, color: Colors.white, size: 18),
+                  child: Icon(
+                    Icons.edit_outlined,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ),
               ),
             ),
@@ -626,7 +738,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           CircleAvatar(
             radius: 32,
             backgroundColor: Colors.white.withValues(alpha: 0.2),
-            backgroundImage: _pickedPhoto != null ? FileImage(_pickedPhoto!) : null,
+            backgroundImage: _pickedPhoto != null
+                ? FileImage(_pickedPhoto!)
+                : null,
             child: _isPickingPhoto
                 ? const SizedBox(
                     width: 22,
@@ -637,14 +751,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   )
                 : (_pickedPhoto == null
-                    ? Icon(
-                        roleLabel == 'Responder'
-                            ? Icons.medical_services_rounded
-                            : Icons.person_rounded,
-                        size: 28,
-                        color: Colors.white,
-                      )
-                    : null),
+                      ? Icon(
+                          roleLabel == 'Responder'
+                              ? Icons.medical_services_rounded
+                              : Icons.person_rounded,
+                          size: 28,
+                          color: Colors.white,
+                        )
+                      : null),
           ),
           Positioned(
             bottom: -2,
@@ -668,7 +782,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _detailRow(IconData icon, String label, String value, {bool locked = false}) {
+  Widget _detailRow(
+    IconData icon,
+    String label,
+    String value, {
+    bool locked = false,
+  }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
@@ -718,7 +837,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           if (locked) ...[
             const SizedBox(width: 8),
-            const Icon(Icons.lock_outline_rounded, size: 16, color: AppColors.textGray),
+            const Icon(
+              Icons.lock_outline_rounded,
+              size: 16,
+              color: AppColors.textGray,
+            ),
           ],
         ],
       ),

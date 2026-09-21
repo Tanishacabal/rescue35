@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'notification_service.dart';
+import 'activity_log_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -96,7 +97,8 @@ class AuthService {
       // Kapag mali lang ang password, subukan ang susunod na account.
       // Ibang error (pending, rejected, disabled, admin) = tumugma ang
       // password, kaya ibalik agad ang mensahe.
-      final isPasswordMismatch = error == 'Wrong password. Please try again.' ||
+      final isPasswordMismatch =
+          error == 'Wrong password. Please try again.' ||
           error == 'Login failed. Please try again.';
       if (!isPasswordMismatch) return error;
       lastError = error;
@@ -131,6 +133,12 @@ class AuthService {
         return 'This account is disabled.';
       }
       unawaited(NotificationService().saveTokenAfterLogin());
+      unawaited(
+        ActivityLogService.log(
+          action: 'login',
+          description: 'Signed in to the mobile app.',
+        ),
+      );
       return null; // null = walang error
     } on FirebaseAuthException catch (e) {
       if (e.code == 'user-not-found') {
@@ -158,6 +166,15 @@ class AuthService {
       }
 
       await _auth.sendPasswordResetEmail(email: cleanEmail);
+      unawaited(
+        ActivityLogService.log(
+          action: 'password_reset_requested',
+          description: 'Requested a password reset link.',
+          entityType: 'user',
+          entityId: userSnap.docs.first.id,
+          userId: userSnap.docs.first.id,
+        ),
+      );
       return null;
     } on FirebaseAuthException catch (e) {
       if (e.code == 'user-not-found') {
@@ -245,6 +262,18 @@ class AuthService {
         });
       }
 
+      unawaited(
+        ActivityLogService.log(
+          action: 'account_registered',
+          description: 'Registered a new $role account.',
+          entityType: 'user',
+          entityId: uid,
+          userId: uid,
+          userName: name.trim(),
+          userRole: role,
+        ),
+      );
+
       return null; // null = walang error
     } on FirebaseAuthException catch (e) {
       if (e.code == 'email-already-in-use') {
@@ -309,6 +338,10 @@ class AuthService {
 
   // ── Logout ───────────────────────────────────────────────
   Future<void> logout() async {
+    await ActivityLogService.log(
+      action: 'logout',
+      description: 'Signed out of the mobile app.',
+    );
     await _auth.signOut();
   }
 }

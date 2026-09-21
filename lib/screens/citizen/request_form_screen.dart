@@ -10,6 +10,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../constants/app_colors.dart';
 import '../../widgets/design_system.dart';
+import '../../services/activity_log_service.dart';
 
 class _UpperCaseTextFormatter extends TextInputFormatter {
   @override
@@ -179,8 +180,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        setState(() => _locationError =
-            'Naka-off ang Location services. I-on muna sa settings ng device.');
+        setState(
+          () => _locationError =
+              'Naka-off ang Location services. I-on muna sa settings ng device.',
+        );
         return;
       }
 
@@ -188,15 +191,19 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          setState(() => _locationError =
-              'Hindi pinayagan ang location access. Kailangan ito para makuha ang kasalukuyang lokasyon.');
+          setState(
+            () => _locationError =
+                'Hindi pinayagan ang location access. Kailangan ito para makuha ang kasalukuyang lokasyon.',
+          );
           return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        setState(() => _locationError =
-            'Permanenteng naka-deny ang location permission. Paki-enable sa App Settings.');
+        setState(
+          () => _locationError =
+              'Permanenteng naka-deny ang location permission. Paki-enable sa App Settings.',
+        );
         return;
       }
 
@@ -282,18 +289,20 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                               child: SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               ),
                             )
                           : (_searchCtrl.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded),
-                                  onPressed: () {
-                                    _searchCtrl.clear();
-                                    setState(() => _results = []);
-                                  },
-                                )
-                              : null),
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear_rounded),
+                                    onPressed: () {
+                                      _searchCtrl.clear();
+                                      setState(() => _results = []);
+                                    },
+                                  )
+                                : null),
                       filled: true,
                       fillColor: Colors.white,
                       border: OutlineInputBorder(
@@ -334,8 +343,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                         final result = _results[i];
                         return ListTile(
                           dense: true,
-                          leading: const Icon(Icons.place_outlined,
-                              color: AppColors.secondary),
+                          leading: const Icon(
+                            Icons.place_outlined,
+                            color: AppColors.secondary,
+                          ),
                           title: Text(
                             result.displayName,
                             maxLines: 2,
@@ -377,8 +388,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                   Container(
                     width: double.infinity,
                     margin: const EdgeInsets.only(bottom: 10),
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 10,
+                      horizontal: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.95),
                       borderRadius: BorderRadius.circular(12),
@@ -390,20 +403,24 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                   )
                 else if (_picked == null)
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Text(
-                        'Maghanap, tap sa mapa, o gamitin ang current location'),
+                      'Maghanap, tap sa mapa, o gamitin ang current location',
+                    ),
                   ),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed:
-                        _picked == null ? null : () => Navigator.pop(context, _picked),
+                    onPressed: _picked == null
+                        ? null
+                        : () => Navigator.pop(context, _picked),
                     icon: const Icon(Icons.check_rounded),
                     label: const Text('Use This Location'),
                   ),
@@ -507,16 +524,16 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   ];
 
   String get _userFullName => _composeName(
-        _userLastNameCtrl.text,
-        _userFirstNameCtrl.text,
-        _userMiCtrl.text,
-      );
+    _userLastNameCtrl.text,
+    _userFirstNameCtrl.text,
+    _userMiCtrl.text,
+  );
 
   String get _patientFullName => _composeName(
-        _patientLastNameCtrl.text,
-        _patientFirstNameCtrl.text,
-        _patientMiCtrl.text,
-      );
+    _patientLastNameCtrl.text,
+    _patientFirstNameCtrl.text,
+    _patientMiCtrl.text,
+  );
 
   String _composeName(String last, String first, String mi) {
     final l = sanitizeInput(last).trim();
@@ -539,27 +556,36 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       final parts = trimmed.split(',');
       lastCtrl.text = parts[0].trim().toUpperCase();
       final rest = parts.length > 1 ? parts[1].trim() : '';
-      final restTokens =
-          rest.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+      final restTokens = rest
+          .split(RegExp(r'\s+'))
+          .where((t) => t.isNotEmpty)
+          .toList();
       if (restTokens.isNotEmpty) {
         final last = restTokens.last;
         final isMi = last.replaceAll('.', '').length == 1;
         if (isMi && restTokens.length > 1) {
           miCtrl.text = last.replaceAll('.', '').toUpperCase();
-          firstCtrl.text =
-              restTokens.sublist(0, restTokens.length - 1).join(' ').toUpperCase();
+          firstCtrl.text = restTokens
+              .sublist(0, restTokens.length - 1)
+              .join(' ')
+              .toUpperCase();
         } else {
           firstCtrl.text = restTokens.join(' ').toUpperCase();
         }
       }
     } else {
-      final tokens =
-          trimmed.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+      final tokens = trimmed
+          .split(RegExp(r'\s+'))
+          .where((t) => t.isNotEmpty)
+          .toList();
       if (tokens.length == 1) {
         firstCtrl.text = tokens[0].toUpperCase();
       } else {
         lastCtrl.text = tokens.last.toUpperCase();
-        firstCtrl.text = tokens.sublist(0, tokens.length - 1).join(' ').toUpperCase();
+        firstCtrl.text = tokens
+            .sublist(0, tokens.length - 1)
+            .join(' ')
+            .toUpperCase();
       }
     }
   }
@@ -601,21 +627,18 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       final fullName =
           (merged['fullName'] ?? merged['name'] ?? merged['fullname'] ?? '')
               .toString();
-      final phone =
-          (merged['phoneNumber'] ?? merged['contactNumber'] ?? '').toString();
+      final phone = (merged['phoneNumber'] ?? merged['contactNumber'] ?? '')
+          .toString();
 
       String address = (merged['address'] ?? '').toString().trim();
       if (address.isEmpty) {
         // No standalone street-address field on the account — fall back
         // to composing one from barangay/municipality/province.
-        address = [
-          merged['barangay'],
-          merged['municipality'],
-          merged['province'],
-        ]
-            .where((p) => p != null && p.toString().trim().isNotEmpty)
-            .map((p) => p.toString().trim())
-            .join(', ');
+        address =
+            [merged['barangay'], merged['municipality'], merged['province']]
+                .where((p) => p != null && p.toString().trim().isNotEmpty)
+                .map((p) => p.toString().trim())
+                .join(', ');
       }
 
       setState(() {
@@ -628,7 +651,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         _userPhoneCtrl.text = phone;
         _userAddressCtrl.text = address;
         _profileLoaded = true;
-        _profileIncomplete = _userFirstNameCtrl.text.trim().isEmpty ||
+        _profileIncomplete =
+            _userFirstNameCtrl.text.trim().isEmpty ||
             _userPhoneCtrl.text.trim().isEmpty ||
             _userAddressCtrl.text.trim().isEmpty;
       });
@@ -664,8 +688,11 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
-          icon: const Icon(Icons.error_outline_rounded,
-              color: AppColors.secondary, size: 40),
+          icon: const Icon(
+            Icons.error_outline_rounded,
+            color: AppColors.secondary,
+            size: 40,
+          ),
           title: const Text('Time Not Available'),
           content: Text(
             'Hindi available ang napiling oras. Pumili sa mga sumusunod:\n\n'
@@ -728,7 +755,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         'address': sanitizeInput(_addressCtrl.text),
       });
 
-      await db.collection('transport_requests').add({
+      final requestRef = await db.collection('transport_requests').add({
         'userID': uid,
         'patientID': patientRef.id,
         'trackingNumber': tracking,
@@ -744,6 +771,14 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         'status': 'pending',
         'timeline': ['Requested'],
       });
+      await ActivityLogService.log(
+        action: 'transport_request_created',
+        description:
+            'Submitted transport request $tracking for $_patientFullName.',
+        entityType: 'transport_request',
+        entityId: requestRef.id,
+        metadata: {'trackingNumber': tracking, 'patientID': patientRef.id},
+      );
 
       if (!mounted) return;
       await showDialog<void>(
@@ -771,9 +806,9 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -784,17 +819,12 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     return RescueGradientScaffold(
       child: Column(
         children: [
-          AppBar(
-            title: const Text('Request Medical Transport'),
-            elevation: 0,
-          ),
+          AppBar(title: const Text('Request Medical Transport'), elevation: 0),
           Expanded(
             child: Form(
               key: _formKey,
               child: !_profileLoaded
-                  ? const Center(
-                      child: CircularProgressIndicator(),
-                    )
+                  ? const Center(child: CircularProgressIndicator())
                   : ListView(
                       padding: const EdgeInsets.all(20),
                       children: [
@@ -826,7 +856,9 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                             Expanded(
                               flex: 2,
                               child: PrimaryButton(
-                                label: _step == 5 ? 'Submit Request' : 'Continue',
+                                label: _step == 5
+                                    ? 'Submit Request'
+                                    : 'Continue',
                                 icon: _step == 5
                                     ? Icons.send_rounded
                                     : Icons.arrow_forward_rounded,
@@ -849,7 +881,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     if (_step == 0) {
       if (_profileIncomplete) {
         _snack(
-            'Kulang ang profile mo. Pakikumpleto muna ito sa Profile settings.');
+          'Kulang ang profile mo. Pakikumpleto muna ito sa Profile settings.',
+        );
         return;
       }
     } else if (_step == 1 && _selectedDate == null) {
@@ -858,7 +891,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     } else if (_step == 2 && _selectedTime == null) {
       _snack('Select an available time slot.');
       return;
-    } else if ((_step == 3 || _step == 4) && !_formKey.currentState!.validate()) {
+    } else if ((_step == 3 || _step == 4) &&
+        !_formKey.currentState!.validate()) {
       return;
     } else if (_step == 4 && _pickupLatLng == null) {
       _snack('Please select a pickup location on the map.');
@@ -868,7 +902,14 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   }
 
   Widget _progress() {
-    final labels = ['Profile', 'Date', 'Time', 'Patient', 'Transport', 'Confirm'];
+    final labels = [
+      'Profile',
+      'Date',
+      'Time',
+      'Patient',
+      'Transport',
+      'Confirm',
+    ];
     return Row(
       children: List.generate(labels.length, (index) {
         final active = index <= _step;
@@ -927,18 +968,21 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
             const SizedBox(height: 12),
             Container(
               width: double.infinity,
-              padding:
-                  const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.3)),
+                  color: AppColors.primary.withValues(alpha: 0.3),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline_rounded,
-                      color: AppColors.primary, size: 18),
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
@@ -997,7 +1041,10 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.access_time_rounded, color: AppColors.primary),
+                  const Icon(
+                    Icons.access_time_rounded,
+                    color: AppColors.primary,
+                  ),
                   const SizedBox(width: 12),
                   Text(
                     _selectedTime ?? 'Tap to select a time',
@@ -1051,8 +1098,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                 child: DropdownButtonFormField<String>(
                   initialValue: _sex,
                   isExpanded: true,
-                  decoration:
-                      rescueInputDecoration('Sex', Icons.wc_outlined),
+                  decoration: rescueInputDecoration('Sex', Icons.wc_outlined),
                   items: const ['Male', 'Female']
                       .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                       .toList(),
@@ -1077,8 +1123,10 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           _gap(),
           DropdownButtonFormField<String>(
             initialValue: _barangay,
-            decoration:
-                rescueInputDecoration('Barangay', Icons.location_city_outlined),
+            decoration: rescueInputDecoration(
+              'Barangay',
+              Icons.location_city_outlined,
+            ),
             items: _barangays
                 .map((b) => DropdownMenuItem(value: b, child: Text(b)))
                 .toList(),
@@ -1113,9 +1161,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
               'Pickup Location',
               Icons.pin_drop_outlined,
               hint: 'Tap to select on map',
-            ).copyWith(
-              suffixIcon: const Icon(Icons.map_outlined),
-            ),
+            ).copyWith(suffixIcon: const Icon(Icons.map_outlined)),
             validator: (v) => _pickupLatLng == null
                 ? 'Please select a pickup location on the map'
                 : null,
@@ -1316,19 +1362,25 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
       textCapitalization: textCapitalization,
       inputFormatters: inputFormatters,
       style: readOnly ? const TextStyle(color: AppColors.textGray) : null,
-      decoration: rescueInputDecoration(
-        label,
-        icon,
-        hint: hint,
-        required: required,
-      ).copyWith(
-        filled: readOnly ? true : null,
-        fillColor: readOnly ? AppColors.border.withValues(alpha: 0.25) : null,
-        suffixIcon: readOnly
-            ? const Icon(Icons.lock_outline_rounded,
-                size: 18, color: AppColors.textGray)
-            : null,
-      ),
+      decoration:
+          rescueInputDecoration(
+            label,
+            icon,
+            hint: hint,
+            required: required,
+          ).copyWith(
+            filled: readOnly ? true : null,
+            fillColor: readOnly
+                ? AppColors.border.withValues(alpha: 0.25)
+                : null,
+            suffixIcon: readOnly
+                ? const Icon(
+                    Icons.lock_outline_rounded,
+                    size: 18,
+                    color: AppColors.textGray,
+                  )
+                : null,
+          ),
       // Read-only fields come straight from the account and can't be fixed
       // here, so there's nothing to validate against on this screen.
       validator: readOnly ? null : validator,
@@ -1358,7 +1410,9 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   }
 
   void _snack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Widget _gap() => const SizedBox(height: 12);
