@@ -16,7 +16,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController(); // email O mobile number
   final _passwordCtrl = TextEditingController();
   final _authService = AuthService();
 
@@ -27,6 +27,27 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _errorMessage;
   int _failedAttempts = 0;
   DateTime? _lockedUntil;
+
+  static const _noAccountForNumber =
+      'No account found with that mobile number.';
+
+  bool _isPhoneLike(String s) => !s.contains('@');
+
+  bool _isValidPhone(String s) {
+    final cleaned = s.replaceAll(RegExp(r'[\s\-()]'), '');
+    return RegExp(r'^(\+63|63|0)?9\d{9}$').hasMatch(cleaned);
+  }
+
+  String? _validateIdentifier(String? v) {
+    final s = (v ?? '').trim();
+    if (s.isEmpty) return 'Email or mobile number is required';
+    if (_isPhoneLike(s)) {
+      return _isValidPhone(s)
+          ? null
+          : 'Enter a valid mobile number (e.g. 09123456789)';
+    }
+    return validateEmail(s);
+  }
 
   Future<void> _login() async {
     final lockedUntil = _lockedUntil;
@@ -45,12 +66,14 @@ class _LoginScreenState extends State<LoginScreen> {
       _passwordAuthError = false;
     });
 
-    final error = await _authService.login(
-      sanitizeInput(_emailCtrl.text),
-      _passwordCtrl.text,
-    );
+    final input = sanitizeInput(_emailCtrl.text);
+
+    final String? error = _isPhoneLike(input)
+        ? await _authService.loginWithPhone(input, _passwordCtrl.text)
+        : await _authService.login(input, _passwordCtrl.text);
 
     if (error != null) {
+      if (!mounted) return;
       setState(() {
         _failedAttempts += 1;
         if (_failedAttempts >= 5) {
@@ -59,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _isLoading = false;
         _errorMessage = error;
         _passwordAuthError = error == 'Wrong password. Please try again.' ||
-          error == 'Login failed. Please try again.';
+            error == 'Login failed. Please try again.';
       });
       return;
     }
@@ -75,14 +98,16 @@ class _LoginScreenState extends State<LoginScreen> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            role == 'responder' ? const ResponderDashboard() : const CitizenDashboard(),
+        builder: (_) => role == 'responder'
+            ? const ResponderDashboard()
+            : const CitizenDashboard(),
       ),
     );
   }
 
   Future<void> _forgotPassword() async {
-    final emailCtrl = TextEditingController(text: _emailCtrl.text.trim());
+    final typed = _emailCtrl.text.trim();
+    final emailCtrl = TextEditingController(text: typed);
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -95,7 +120,7 @@ class _LoginScreenState extends State<LoginScreen> {
               controller: emailCtrl,
               keyboardType: TextInputType.emailAddress,
               decoration: rescueInputDecoration(
-                  'Email address', Icons.email_outlined),
+                  'Email or mobile number', Icons.person_outline),
             ),
             const SizedBox(height: 10),
             const Text(
@@ -122,12 +147,30 @@ class _LoginScreenState extends State<LoginScreen> {
     if (result.trim().isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter your email address first.')),
+        const SnackBar(
+            content: Text('Enter your email or mobile number first.')),
       );
       return;
     }
 
-    final error = await _authService.sendPasswordReset(result);
+    // Kung number ang inilagay, hanapin muna ang email.
+    String targetEmail = result.trim();
+    if (_isPhoneLike(targetEmail)) {
+      final resolved = await _authService.getEmailByPhone(targetEmail);
+      if (!mounted) return;
+      if (resolved == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(_noAccountForNumber),
+            backgroundColor: AppColors.primary,
+          ),
+        );
+        return;
+      }
+      targetEmail = resolved;
+    }
+
+    final error = await _authService.sendPasswordReset(targetEmail);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -219,11 +262,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           controller: _emailCtrl,
                           keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.next,
+                          autocorrect: false,
                           decoration: rescueInputDecoration(
-                            'Email address',
-                            Icons.email_outlined,
+                            'Email or mobile number',
+                            Icons.person_outline,
                           ),
-                          validator: validateEmail,
+                          validator: _validateIdentifier,
                         ),
                         const SizedBox(height: 14),
                         TextFormField(

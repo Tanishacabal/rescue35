@@ -453,6 +453,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   String _barangay = 'Centro';
   String _hospital = 'Lal-lo District Hospital';
   bool _profileLoaded = false;
+  bool _profileIncomplete = false;
 
   final List<TimeOfDay> _availableTimeSlots = const [
     TimeOfDay(hour: 8, minute: 0),
@@ -569,30 +570,73 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     _loadUserProfile();
   }
 
+  /// Pulls the requester's profile straight from their Firestore account
+  /// (the `users` doc merged with their `citizens` doc — the same schema
+  /// ProfileScreen reads) and fills the read-only profile fields with it.
+  /// Nothing here is user-editable in this form — if their saved profile
+  /// is wrong, they need to fix it in Profile settings, not re-type it
+  /// mid-request.
   Future<void> _loadUserProfile() async {
     try {
       final uid = FirebaseAuth.instance.currentUser!.uid;
-      final doc =
-          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final db = FirebaseFirestore.instance;
 
-      if (doc.exists) {
-        final data = doc.data() ?? {};
-        setState(() {
-          _splitFullNameInto(
-            data['fullName'] ?? '',
-            _userLastNameCtrl,
-            _userFirstNameCtrl,
-            _userMiCtrl,
-          );
-          _userPhoneCtrl.text = data['phoneNumber'] ?? '';
-          _userAddressCtrl.text = data['address'] ?? '';
-          _profileLoaded = true;
-        });
-      } else {
-        setState(() => _profileLoaded = true);
+      final userDoc = await db.collection('users').doc(uid).get();
+      final userData = userDoc.data() ?? {};
+
+      Map<String, dynamic> roleData = {};
+      final citizenSnap = await db
+          .collection('citizens')
+          .where('userID', isEqualTo: uid)
+          .limit(1)
+          .get();
+      if (citizenSnap.docs.isNotEmpty) {
+        roleData = citizenSnap.docs.first.data();
       }
+
+      // Role doc (citizens) takes precedence since that's the source
+      // ProfileScreen edits go to.
+      final merged = {...userData, ...roleData};
+
+      final fullName =
+          (merged['fullName'] ?? merged['name'] ?? merged['fullname'] ?? '')
+              .toString();
+      final phone =
+          (merged['phoneNumber'] ?? merged['contactNumber'] ?? '').toString();
+
+      String address = (merged['address'] ?? '').toString().trim();
+      if (address.isEmpty) {
+        // No standalone street-address field on the account — fall back
+        // to composing one from barangay/municipality/province.
+        address = [
+          merged['barangay'],
+          merged['municipality'],
+          merged['province'],
+        ]
+            .where((p) => p != null && p.toString().trim().isNotEmpty)
+            .map((p) => p.toString().trim())
+            .join(', ');
+      }
+
+      setState(() {
+        _splitFullNameInto(
+          fullName,
+          _userLastNameCtrl,
+          _userFirstNameCtrl,
+          _userMiCtrl,
+        );
+        _userPhoneCtrl.text = phone;
+        _userAddressCtrl.text = address;
+        _profileLoaded = true;
+        _profileIncomplete = _userFirstNameCtrl.text.trim().isEmpty ||
+            _userPhoneCtrl.text.trim().isEmpty ||
+            _userAddressCtrl.text.trim().isEmpty;
+      });
     } catch (e) {
-      setState(() => _profileLoaded = true);
+      setState(() {
+        _profileLoaded = true;
+        _profileIncomplete = true;
+      });
     }
   }
 
@@ -803,7 +847,11 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
 
   void _next() {
     if (_step == 0) {
-      if (!_formKey.currentState!.validate()) return;
+      if (_profileIncomplete) {
+        _snack(
+            'Kulang ang profile mo. Pakikumpleto muna ito sa Profile settings.');
+        return;
+      }
     } else if (_step == 1 && _selectedDate == null) {
       _snack('Select an available future date.');
       return;
@@ -847,21 +895,23 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           _title(Icons.person_outline, 'Your Profile Information'),
           const SizedBox(height: 8),
           const Text(
-            'Please confirm your contact information',
+            'Ito ang naka-save sa iyong account. I-edit sa Profile settings kung mali.',
             style: TextStyle(color: AppColors.textGray, fontSize: 12),
           ),
           const SizedBox(height: 16),
-          _nameRow(_userLastNameCtrl, _userFirstNameCtrl, _userMiCtrl),
+          _nameRow(
+            _userLastNameCtrl,
+            _userFirstNameCtrl,
+            _userMiCtrl,
+            readOnly: true,
+          ),
           _gap(),
           _field(
             _userPhoneCtrl,
             'Phone Number',
             Icons.phone_outlined,
             inputType: TextInputType.phone,
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
-              LengthLimitingTextInputFormatter(13),
-            ],
+            readOnly: true,
             validator: validatePhilippineMobile,
           ),
           _gap(),
@@ -870,9 +920,36 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
             'Address',
             Icons.home_outlined,
             maxLines: 2,
-            inputFormatters: [LengthLimitingTextInputFormatter(200)],
+            readOnly: true,
             validator: validateAddress,
           ),
+          if (_profileIncomplete) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding:
+                  const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded,
+                      color: AppColors.primary, size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Kulang ang profile mo sa account. Punan muna ito sa Profile settings bago mag-request.',
+                      style: TextStyle(fontSize: 12, color: AppColors.dark),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1170,8 +1247,9 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   Widget _nameRow(
     TextEditingController lastCtrl,
     TextEditingController firstCtrl,
-    TextEditingController miCtrl,
-  ) {
+    TextEditingController miCtrl, {
+    bool readOnly = false,
+  }) {
     return Column(
       children: [
         _field(
@@ -1179,6 +1257,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           'Last Name',
           Icons.person_outline,
           textCapitalization: TextCapitalization.characters,
+          readOnly: readOnly,
           inputFormatters: [
             _UpperCaseTextFormatter(),
             LengthLimitingTextInputFormatter(50),
@@ -1191,6 +1270,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           'First Name',
           Icons.person_outline,
           textCapitalization: TextCapitalization.characters,
+          readOnly: readOnly,
           inputFormatters: [
             _UpperCaseTextFormatter(),
             LengthLimitingTextInputFormatter(50),
@@ -1203,6 +1283,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
           'Middle Initial',
           Icons.short_text_rounded,
           textCapitalization: TextCapitalization.characters,
+          readOnly: readOnly,
           inputFormatters: [
             _UpperCaseTextFormatter(),
             LengthLimitingTextInputFormatter(1),
@@ -1224,21 +1305,33 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     TextCapitalization textCapitalization = TextCapitalization.none,
     List<TextInputFormatter>? inputFormatters,
     bool required = true,
+    bool readOnly = false,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: ctrl,
       maxLines: maxLines,
+      readOnly: readOnly,
       keyboardType: inputType,
       textCapitalization: textCapitalization,
       inputFormatters: inputFormatters,
+      style: readOnly ? const TextStyle(color: AppColors.textGray) : null,
       decoration: rescueInputDecoration(
         label,
         icon,
         hint: hint,
         required: required,
+      ).copyWith(
+        filled: readOnly ? true : null,
+        fillColor: readOnly ? AppColors.border.withValues(alpha: 0.25) : null,
+        suffixIcon: readOnly
+            ? const Icon(Icons.lock_outline_rounded,
+                size: 18, color: AppColors.textGray)
+            : null,
       ),
-      validator: validator,
+      // Read-only fields come straight from the account and can't be fixed
+      // here, so there's nothing to validate against on this screen.
+      validator: readOnly ? null : validator,
     );
   }
 

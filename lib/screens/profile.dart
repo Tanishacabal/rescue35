@@ -24,6 +24,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isPickingPhoto = false;
   bool _photoLoaded = false;
 
+  // Kept stable across rebuilds (instead of re-created inside build) so
+  // opening/saving the edit sheet doesn't trigger a duplicate Firestore
+  // read or reset the sheet mid-edit.
+  late Future<Map<String, dynamic>> _profileFuture;
+
+  // Reference to the citizens/responders doc backing this profile, if one
+  // exists. Populated by _loadProfileData and used by _saveProfileEdits.
+  DocumentReference<Map<String, dynamic>>? _roleDocRef;
+
   String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
   String get _photoPrefsKey => 'profile_photo_path_$_uid';
 
@@ -31,6 +40,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadSavedPhoto();
+    _profileFuture = _loadProfileData(_uid, widget.role);
+  }
+
+  void _refreshProfile() {
+    setState(() {
+      _profileFuture = _loadProfileData(_uid, widget.role);
+    });
   }
 
   Future<void> _loadSavedPhoto() async {
@@ -160,6 +176,177 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Opens the edit sheet prefilled with the current profile `data`.
+  /// Email is intentionally left out of this form — it's never editable
+  /// from here, only shown as a read-only detail row on the main screen.
+  void _showEditProfileSheet(Map<String, dynamic> data) {
+    final nameCtrl = TextEditingController(
+      text: (data['name'] ?? data['fullname'] ?? data['responder_name'] ?? '').toString(),
+    );
+    final contactCtrl = TextEditingController(text: (data['contactNumber'] ?? '').toString());
+    final barangayCtrl = TextEditingController(text: (data['barangay'] ?? '').toString());
+    final municipalityCtrl =
+        TextEditingController(text: (data['municipality'] ?? 'Lal-lo').toString());
+    final provinceCtrl = TextEditingController(text: (data['province'] ?? 'Cagayan').toString());
+    final formKey = GlobalKey<FormState>();
+    final isCitizen = widget.role == 'citizen';
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      showDragHandle: true,
+      builder: (sheetContext) {
+        bool isSaving = false;
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 8,
+                bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Edit Profile',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.dark,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Hindi puwedeng baguhin ang email address dito.',
+                        style: TextStyle(color: AppColors.textGray, fontSize: 12),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: nameCtrl,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: rescueInputDecoration('Full Name', Icons.badge_outlined),
+                        validator: (v) =>
+                            (v == null || v.trim().length < 2) ? 'Enter your full name' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: contactCtrl,
+                        keyboardType: TextInputType.phone,
+                        decoration: rescueInputDecoration('Mobile Number', Icons.phone_outlined),
+                        validator: (v) {
+                          final text = (v ?? '').trim();
+                          if (text.isEmpty) return 'Mobile number is required';
+                          return null;
+                        },
+                      ),
+                      if (isCitizen) ...[
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: barangayCtrl,
+                          decoration:
+                              rescueInputDecoration('Barangay', Icons.location_city_outlined),
+                          validator: (v) =>
+                              (v == null || v.trim().isEmpty) ? 'Barangay is required' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: municipalityCtrl,
+                          decoration: rescueInputDecoration(
+                              'Municipality / City', Icons.business_outlined),
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: provinceCtrl,
+                          decoration: rescueInputDecoration('Province', Icons.map_outlined),
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        child: PrimaryButton(
+                          label: 'Save Changes',
+                          icon: Icons.check_rounded,
+                          loading: isSaving,
+                          onPressed: isSaving
+                              ? null
+                              : () async {
+                                  if (!formKey.currentState!.validate()) return;
+                                  setSheetState(() => isSaving = true);
+                                  try {
+                                    await _saveProfileEdits(
+                                      name: nameCtrl.text.trim(),
+                                      contactNumber: contactCtrl.text.trim(),
+                                      barangay: barangayCtrl.text.trim(),
+                                      municipality: municipalityCtrl.text.trim(),
+                                      province: provinceCtrl.text.trim(),
+                                    );
+                                    if (sheetContext.mounted) Navigator.pop(sheetContext);
+                                    _refreshProfile();
+                                  } catch (e) {
+                                    setSheetState(() => isSaving = false);
+                                    if (!mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Unable to save: $e')),
+                                    );
+                                  }
+                                },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Writes the edited fields back to `users` and, when it exists, the
+  /// role-specific (`citizens`/`responders`) doc. Email is never touched
+  /// here — it's excluded from both the form and this write.
+  Future<void> _saveProfileEdits({
+    required String name,
+    required String contactNumber,
+    required String barangay,
+    required String municipality,
+    required String province,
+  }) async {
+    final uid = _uid;
+
+    await FirebaseFirestore.instance.collection('users').doc(uid).set(
+      {
+        'fullName': name,
+        'phoneNumber': contactNumber,
+      },
+      SetOptions(merge: true),
+    );
+
+    if (_roleDocRef != null) {
+      final roleUpdate = <String, dynamic>{
+        'name': name,
+        'contactNumber': contactNumber,
+      };
+      if (widget.role == 'citizen') {
+        roleUpdate['barangay'] = barangay;
+        roleUpdate['municipality'] = municipality;
+        roleUpdate['province'] = province;
+      }
+      await _roleDocRef!.set(roleUpdate, SetOptions(merge: true));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final uid = _uid;
@@ -176,7 +363,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return RescueGradientScaffold(
       child: FutureBuilder<Map<String, dynamic>>(
-        future: _loadProfileData(uid, widget.role),
+        future: _profileFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting || !_photoLoaded) {
             return const Center(
@@ -201,7 +388,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // === HEADER CARD ===
-                _headerCard(name, roleLabel, isVerified),
+                _headerCard(
+                  name,
+                  roleLabel,
+                  isVerified,
+                  onEditTap: () => _showEditProfileSheet(data),
+                ),
                 const SizedBox(height: 28),
 
                 // === PERSONAL INFORMATION ===
@@ -213,7 +405,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       _detailRow(Icons.badge_outlined, 'Full Name', name),
                       const SizedBox(height: 16),
-                      _detailRow(Icons.email_outlined, 'Email Address', email),
+                      _detailRow(Icons.email_outlined, 'Email Address', email, locked: true),
                       const SizedBox(height: 16),
                       _detailRow(Icons.phone_outlined, 'Mobile Number', contact),
                       const SizedBox(height: 16),
@@ -321,85 +513,103 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<Map<String, dynamic>> _loadProfileData(String uid, String role) async {
     final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
     final userData = userDoc.data() ?? {};
-    if (role == 'citizen') {
-      final citizenSnap = await FirebaseFirestore.instance
-          .collection('citizens')
-          .where('userID', isEqualTo: uid)
-          .limit(1)
-          .get();
-      if (citizenSnap.docs.isNotEmpty) {
-        return {...userData, ...citizenSnap.docs.first.data()};
-      }
-    } else {
-      final responderSnap = await FirebaseFirestore.instance
-          .collection('responders')
-          .where('userID', isEqualTo: uid)
-          .limit(1)
-          .get();
-      if (responderSnap.docs.isNotEmpty) {
-        return {...userData, ...responderSnap.docs.first.data()};
-      }
+    final collectionName = role == 'citizen' ? 'citizens' : 'responders';
+    final roleSnap = await FirebaseFirestore.instance
+        .collection(collectionName)
+        .where('userID', isEqualTo: uid)
+        .limit(1)
+        .get();
+    if (roleSnap.docs.isNotEmpty) {
+      _roleDocRef = roleSnap.docs.first.reference;
+      return {...userData, ...roleSnap.docs.first.data()};
     }
+    _roleDocRef = null;
     return userData;
   }
 
-  Widget _headerCard(String name, String roleLabel, bool isVerified) {
+  Widget _headerCard(
+    String name,
+    String roleLabel,
+    bool isVerified, {
+    required VoidCallback onEditTap,
+  }) {
     return GlassCard(
       color: AppColors.primary,
       radius: 24,
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-      child: Column(
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          _avatar(roleLabel),
-          const SizedBox(height: 14),
-          Text(
-            name,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              roleLabel,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
+          Column(
+            children: [
+              _avatar(roleLabel),
+              const SizedBox(height: 14),
+              Text(
+                name,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.shield_outlined, color: Colors.white70, size: 18),
-                const SizedBox(width: 8),
-                Text(
-                  isVerified ? 'Account verified' : 'Verification in progress',
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  roleLabel,
                   style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-              ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.shield_outlined, color: Colors.white70, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      isVerified ? 'Account verified' : 'Verification in progress',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          Positioned(
+            top: -6,
+            right: -6,
+            child: Material(
+              color: Colors.white.withValues(alpha: 0.16),
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onEditTap,
+                child: const Padding(
+                  padding: EdgeInsets.all(9),
+                  child: Icon(Icons.edit_outlined, color: Colors.white, size: 18),
+                ),
+              ),
             ),
           ),
         ],
@@ -458,7 +668,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _detailRow(IconData icon, String label, String value) {
+  Widget _detailRow(IconData icon, String label, String value, {bool locked = false}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
@@ -506,6 +716,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
+          if (locked) ...[
+            const SizedBox(width: 8),
+            const Icon(Icons.lock_outline_rounded, size: 16, color: AppColors.textGray),
+          ],
         ],
       ),
     );

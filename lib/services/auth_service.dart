@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -15,6 +16,93 @@ class AuthService {
 
   // ── Kumuha ng current user ──────────────────────────────
   User? get currentUser => _auth.currentUser;
+
+  // ── Phone helpers ───────────────────────────────────────
+  // Ginagawang 09XXXXXXXXX ang kahit anong PH mobile format
+  String _normalizePhone(String input) {
+    final digits = input.replaceAll(RegExp(r'\D'), '');
+    if (digits.length < 10) return input.trim();
+    return '0${digits.substring(digits.length - 10)}';
+  }
+
+  // Lahat ng posibleng format na naka-save sa Firestore
+  List<String> _phoneVariants(String input) {
+    final digits = input.replaceAll(RegExp(r'\D'), '');
+    if (digits.length < 10) return [];
+    final n = digits.substring(digits.length - 10); // 9XXXXXXXXX
+    return ['0$n', '+63$n', '63$n', n];
+  }
+
+  // ── Hanapin LAHAT ng email na naka-link sa number ───────
+  // Nagta-throw ng FirebaseException kapag nag-error ang query
+  Future<List<String>> _queryEmailsByPhone(String input) async {
+    final variants = _phoneVariants(input);
+    if (variants.isEmpty) return [];
+
+    final snap = await _db
+        .collection('users')
+        .where('contactNumber', whereIn: variants)
+        .limit(10)
+        .get();
+    debugPrint('Phone lookup variants: $variants, found: ${snap.docs.length}');
+
+    final emails = <String>[];
+    for (final d in snap.docs) {
+      final email = (d.data()['email'] as String?)?.trim() ?? '';
+      if (email.isNotEmpty && !emails.contains(email)) emails.add(email);
+    }
+    return emails;
+  }
+
+  // Unang email lang (para sa forgot password). Null kapag wala o nag-error.
+  Future<String?> getEmailByPhone(String input) async {
+    try {
+      final emails = await _queryEmailsByPhone(input);
+      return emails.isEmpty ? null : emails.first;
+    } catch (e) {
+      debugPrint('Phone lookup error: $e');
+      return null;
+    }
+  }
+
+  // ── Login gamit ang mobile number ───────────────────────
+  // Kung maraming account ang may parehong number, susubukan
+  // ang password sa bawat isa hanggang may tumugma.
+  Future<String?> loginWithPhone(String phone, String password) async {
+    List<String> emails;
+    try {
+      emails = await _queryEmailsByPhone(phone);
+    } on FirebaseException catch (e) {
+      debugPrint('Phone lookup error: ${e.code} ${e.message}');
+      if (e.code == 'permission-denied') {
+        return 'Lookup blocked by Firestore rules (permission-denied). '
+            'Update the rules for the users collection.';
+      }
+      return 'Lookup error: ${e.code}';
+    } catch (e) {
+      debugPrint('Phone lookup error: $e');
+      return 'Lookup error: $e';
+    }
+
+    if (emails.isEmpty) {
+      return 'No account found with that mobile number.';
+    }
+
+    String? lastError;
+    for (final email in emails) {
+      final error = await login(email, password);
+      if (error == null) return null; // success
+
+      // Kapag mali lang ang password, subukan ang susunod na account.
+      // Ibang error (pending, rejected, disabled, admin) = tumugma ang
+      // password, kaya ibalik agad ang mensahe.
+      final isPasswordMismatch = error == 'Wrong password. Please try again.' ||
+          error == 'Login failed. Please try again.';
+      if (!isPasswordMismatch) return error;
+      lastError = error;
+    }
+    return lastError ?? 'Wrong password. Please try again.';
+  }
 
   // ── Login ───────────────────────────────────────────────
   Future<String?> login(String email, String password) async {
@@ -94,6 +182,19 @@ class AuthService {
     String proofFilePath = '',
   }) async {
     try {
+      // Step 0: Siguraduhing unique ang mobile number
+      final variants = _phoneVariants(contact);
+      if (variants.isNotEmpty) {
+        final existing = await _db
+            .collection('users')
+            .where('contactNumber', whereIn: variants)
+            .limit(1)
+            .get();
+        if (existing.docs.isNotEmpty) {
+          return 'Mobile number already registered.';
+        }
+      }
+
       // Step 1: Gumawa ng Firebase Auth account
       final cred = await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
@@ -106,7 +207,7 @@ class AuthService {
         'userID': uid,
         'name': name.trim(),
         'email': email.trim(),
-        'contactNumber': contact.trim(),
+        'contactNumber': _normalizePhone(contact),
         'role': role,
         'accountStatus': role == 'citizen' ? 'pending' : 'verified',
         'createdAt': FieldValue.serverTimestamp(),
