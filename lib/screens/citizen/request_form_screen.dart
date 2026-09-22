@@ -472,13 +472,6 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   bool _profileLoaded = false;
   bool _profileIncomplete = false;
 
-  final List<TimeOfDay> _availableTimeSlots = const [
-    TimeOfDay(hour: 8, minute: 0),
-    TimeOfDay(hour: 10, minute: 0),
-    TimeOfDay(hour: 13, minute: 0),
-    TimeOfDay(hour: 15, minute: 0),
-  ];
-
   final _hospitals = const [
     'Lal-lo District Hospital',
     'Cagayan Valley Medical Center',
@@ -674,40 +667,10 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   Future<void> _pickTime() async {
     final picked = await showTimePicker(
       context: context,
-      initialTime: _selectedTimeOfDay ?? _availableTimeSlots.first,
+      initialTime: _selectedTimeOfDay ?? TimeOfDay.now(),
       helpText: 'Select Pickup Time',
     );
     if (picked == null) return;
-
-    final isAvailable = _availableTimeSlots.any(
-      (slot) => slot.hour == picked.hour && slot.minute == picked.minute,
-    );
-
-    if (!isAvailable) {
-      if (!mounted) return;
-      showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          icon: const Icon(
-            Icons.error_outline_rounded,
-            color: AppColors.secondary,
-            size: 40,
-          ),
-          title: const Text('Time Not Available'),
-          content: Text(
-            'Hindi available ang napiling oras. Pumili sa mga sumusunod:\n\n'
-            '${_availableTimeSlots.map(_formatTimeOfDay).join('  •  ')}',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
 
     setState(() {
       _selectedTimeOfDay = picked;
@@ -1000,7 +963,8 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   }
 
   Widget _dateStep() {
-    final today = DateTime.now();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     return GlassCard(
       key: const ValueKey('date'),
       child: Column(
@@ -1008,14 +972,14 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         children: [
           _title(Icons.calendar_month_outlined, 'Select Schedule Date'),
           CalendarDatePicker(
-            initialDate: _selectedDate ?? today.add(const Duration(days: 1)),
+            initialDate: _selectedDate ?? today,
             firstDate: today,
             lastDate: today.add(const Duration(days: 60)),
             onDateChanged: (date) => setState(() => _selectedDate = date),
           ),
           const SizedBox(height: 8),
           const Text(
-            'Past dates and fully booked LGU schedules are disabled during final admin configuration.',
+            'Past dates are not available for transport requests.',
             style: TextStyle(color: AppColors.textGray, fontSize: 12),
           ),
         ],
@@ -1061,9 +1025,9 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          Text(
-            'Available slots: ${_availableTimeSlots.map(_formatTimeOfDay).join(', ')}',
-            style: const TextStyle(color: AppColors.textGray, fontSize: 12),
+          const Text(
+            'All pickup times are available.',
+            style: TextStyle(color: AppColors.textGray, fontSize: 12),
           ),
         ],
       ),
