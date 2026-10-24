@@ -1,11 +1,13 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../constants/app_colors.dart';
+import '../../services/app_language.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/design_system.dart';
+import '../../widgets/localized_text.dart' show Text;
 
 /// Forces whatever the user types into ALL CAPS as they type it.
 class _UpperCaseTextFormatter extends TextInputFormatter {
@@ -235,10 +237,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: Column(
         children: [
           AppBar(
-            title: const Text('Citizen Registration'),
+            title: Text(translate(context, 'Citizen Registration')),
             actions: [
+              const AppLanguageSwitcher(compact: true),
               IconButton(
-                tooltip: 'Back',
+                tooltip: translate(context, 'Back'),
                 icon: const Icon(Icons.close_rounded),
                 onPressed: () => Navigator.maybePop(context),
               ),
@@ -257,9 +260,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
+                          children: [
                             Text(
-                              'Create your account',
+                              translate(context, 'Create your account'),
                               style: TextStyle(
                                 color: AppColors.dark,
                                 fontSize: 20,
@@ -268,7 +271,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                             SizedBox(height: 4),
                             Text(
-                              'Complete the steps below for MDRRMO verification.',
+                              translate(
+                                context,
+                                'Complete the steps below for MDRRMO verification.',
+                              ),
                               style: TextStyle(
                                 color: AppColors.textGray,
                                 height: 1.4,
@@ -309,14 +315,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         child: OutlinedButton.icon(
                           onPressed: () => setState(() => _step -= 1),
                           icon: const Icon(Icons.arrow_back_rounded),
-                          label: const Text('Back'),
+                          label: Text(translate(context, 'Back')),
                         ),
                       ),
                     if (_step > 0) const SizedBox(width: 12),
                     Expanded(
                       flex: 2,
                       child: PrimaryButton(
-                        label: _step == 2 ? 'Create Account' : 'Continue',
+                        label: translate(
+                          context,
+                          _step == 2 ? 'Create Account' : 'Continue',
+                        ),
                         icon: _step == 2
                             ? Icons.verified_outlined
                             : Icons.arrow_forward_rounded,

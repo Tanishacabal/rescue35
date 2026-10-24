@@ -1,8 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../services/app_language.dart';
 import '../../constants/app_colors.dart';
 import '../../widgets/design_system.dart';
+import '../../widgets/localized_text.dart' show Text;
 import 'dart:io';
 import '../../services/ocr_service.dart';
 import '../../services/activity_log_service.dart';
@@ -526,6 +528,7 @@ class _PCRFormScreenState extends State<PCRFormScreen> {
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           title: const Text('PCR Report Form'),
+          actions: const [AppLanguageSwitcher(compact: true)],
           elevation: 0,
         ),
         body: const Center(child: CircularProgressIndicator()),
@@ -537,6 +540,7 @@ class _PCRFormScreenState extends State<PCRFormScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         title: const Text('PCR Report Form'),
+        actions: const [AppLanguageSwitcher(compact: true)],
         elevation: 0,
       ),
       body: SingleChildScrollView(

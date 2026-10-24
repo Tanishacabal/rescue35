@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../constants/app_colors.dart';
+import '../../services/app_language.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/design_system.dart';
 import '../citizen/citizen_dashboard.dart';
@@ -63,70 +64,85 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     return RescueGradientScaffold(
       safeArea: false,
-      child: Center(
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) {
-            final value = Curves.easeInOut.transform(_controller.value);
-            return Padding(
-              padding: const EdgeInsets.all(28),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    height: 96,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        CustomPaint(
-                          size: const Size(double.infinity, 70),
-                          painter: _EcgPainter(progress: value),
+      child: Stack(
+        children: [
+          Center(
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, _) {
+                final value = Curves.easeInOut.transform(_controller.value);
+                return Padding(
+                  padding: const EdgeInsets.all(28),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        height: 96,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            CustomPaint(
+                              size: const Size(double.infinity, 70),
+                              painter: _EcgPainter(progress: value),
+                            ),
+                            Transform.translate(
+                              offset: Offset((value * 250) - 125, -6),
+                              child: const Icon(
+                                Icons.emergency_share_rounded,
+                                color: AppColors.primary,
+                                size: 34,
+                              ),
+                            ),
+                          ],
                         ),
-                        Transform.translate(
-                          offset: Offset((value * 250) - 125, -6),
-                          child: const Icon(
-                            Icons.emergency_share_rounded,
-                            color: AppColors.primary,
-                            size: 34,
-                          ),
+                      ),
+                      const SizedBox(height: 20),
+                      Opacity(
+                        opacity: (_controller.value * 1.4).clamp(0.0, 1.0),
+                        child: const RescueLogo(size: 84),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'RESCUE 35',
+                        style: TextStyle(
+                          fontSize: 30,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.dark,
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'MDRRMO Lal-lo, Cagayan',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.secondary,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        translate(
+                          context,
+                          'Faster Response. Better Care. Smarter Emergency Management.',
+                        ),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.textGray,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-                  Opacity(
-                    opacity: (_controller.value * 1.4).clamp(0.0, 1.0),
-                    child: const RescueLogo(size: 84),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'RESCUE 35',
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.dark,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'MDRRMO Lal-lo, Cagayan',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.secondary,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    'Faster Response. Better Care. Smarter Emergency Management.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: AppColors.textGray, height: 1.4),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
+                );
+              },
+            ),
+          ),
+          const Positioned(
+            top: 44,
+            right: 12,
+            child: SafeArea(child: AppLanguageSwitcher()),
+          ),
+        ],
       ),
     );
   }

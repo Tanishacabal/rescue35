@@ -1,16 +1,19 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
 import 'constants/app_colors.dart';
 import 'screens/onboarding/splash_screen.dart';
+import 'services/app_language.dart';
 import 'services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await loadSavedAppLanguage();
 
   try {
     await Firebase.initializeApp(
@@ -31,9 +34,14 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return ValueListenableBuilder<Locale>(
+      valueListenable: appLocale,
+      builder: (context, locale, _) => MaterialApp(
       title: 'Rescue 35',
       debugShowCheckedModeBanner: false,
+      locale: locale,
+      supportedLocales: const [Locale('en'), Locale('tl')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       navigatorKey: navigatorKey, // ← ito lang ang idinagdag
       theme: ThemeData(
         useMaterial3: true,
@@ -128,6 +136,7 @@ class MyApp extends StatelessWidget {
         ),
       ),
       home: const SplashScreen(),
+      ),
     );
   }
 }

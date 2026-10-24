@@ -342,6 +342,14 @@ class AuthService {
       action: 'logout',
       description: 'Signed out of the mobile app.',
     );
+    try {
+      await NotificationService().removeTokenBeforeLogout();
+    } on FirebaseException catch (error) {
+      debugPrint(
+        'Unable to remove notification token before logout: '
+        '${error.code} ${error.message}',
+      );
+    }
     await _auth.signOut();
   }
 }

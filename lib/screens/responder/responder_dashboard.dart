@@ -1,12 +1,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 import '../../constants/app_colors.dart';
+import '../../services/app_language.dart';
 import '../../services/auth_service.dart';
 import '../../services/call_log_service.dart';
 import '../../services/activity_log_service.dart';
 import '../../widgets/design_system.dart';
+import '../../widgets/localized_text.dart' show Text;
 import '../profile.dart';
+import '../notifications/notifications_screen.dart';
 import 'pcr_form_screen.dart';
 import 'pcr_form_standalone_screen.dart';
 import 'in_app_map_screen.dart';
@@ -71,6 +74,11 @@ class _ResponderDashboardState extends State<ResponderDashboard>
       label: 'PCR',
     ),
     _NavItem(
+      icon: Icons.notifications_none_rounded,
+      activeIcon: Icons.notifications_active_rounded,
+      label: 'Alerts',
+    ),
+    _NavItem(
       icon: Icons.person_outline_rounded,
       activeIcon: Icons.person_rounded,
       label: 'Profile',
@@ -92,6 +100,10 @@ class _ResponderDashboardState extends State<ResponderDashboard>
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
+      appBar: AppBar(
+        title: const Text('RESCUE 35'),
+        actions: const [AppLanguageSwitcher()],
+      ),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -110,6 +122,7 @@ class _ResponderDashboardState extends State<ResponderDashboard>
               openPcr: _openPcrForDoc,
             ),
             _PcrTab(openEmergencyPcr: _openEmergencyPcr),
+            const NotificationsScreen(),
             const ProfileScreen(role: 'responder'),
           ],
         ),
@@ -1841,7 +1854,7 @@ class _FloatingNavBar extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        item.label,
+                        translate(context, item.label),
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: selected

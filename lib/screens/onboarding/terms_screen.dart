@@ -1,7 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 
 import '../../constants/app_colors.dart';
+import '../../services/app_language.dart';
 import '../../widgets/design_system.dart';
+import '../../widgets/localized_text.dart' show Text;
 
 class TermsScreen extends StatefulWidget {
   final Widget next;
@@ -23,6 +25,10 @@ class _TermsScreenState extends State<TermsScreen> {
       child: ListView(
         padding: const EdgeInsets.all(22),
         children: [
+          const Align(
+            alignment: Alignment.centerRight,
+            child: AppLanguageSwitcher(),
+          ),
           const Row(
             children: [
               RescueLogo(size: 52),

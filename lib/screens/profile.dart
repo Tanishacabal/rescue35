@@ -1,12 +1,14 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_colors.dart';
+import '../services/app_language.dart';
 import '../widgets/design_system.dart';
+import '../widgets/localized_text.dart' show Text;
 import '../services/activity_log_service.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -455,6 +457,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const Align(
+                  alignment: Alignment.centerRight,
+                  child: AppLanguageSwitcher(),
+                ),
                 // === HEADER CARD ===
                 _headerCard(
                   name,

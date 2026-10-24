@@ -1,5 +1,6 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../services/app_language.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -10,6 +11,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../constants/app_colors.dart';
 import '../../widgets/design_system.dart';
+import '../../widgets/localized_text.dart' show Text;
 import '../../services/activity_log_service.dart';
 
 class _UpperCaseTextFormatter extends TextInputFormatter {
@@ -231,7 +233,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Tap to Select Pickup Location')),
+      appBar: AppBar(
+        title: const Text('Tap to Select Pickup Location'),
+        actions: const [AppLanguageSwitcher(compact: true)],
+      ),
       body: Stack(
         children: [
           FlutterMap(
@@ -782,7 +787,11 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
     return RescueGradientScaffold(
       child: Column(
         children: [
-          AppBar(title: const Text('Request Medical Transport'), elevation: 0),
+          AppBar(
+            title: const Text('Request Medical Transport'),
+            actions: const [AppLanguageSwitcher(compact: true)],
+            elevation: 0,
+          ),
           Expanded(
             child: Form(
               key: _formKey,

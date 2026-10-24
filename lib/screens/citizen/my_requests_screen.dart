@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../constants/app_colors.dart';
+import '../../services/app_language.dart';
 import '../../widgets/design_system.dart';
+import '../../widgets/localized_text.dart' show Text;
 import '../profile.dart';
 
 class MyRequestsScreen extends StatelessWidget {
@@ -36,10 +38,13 @@ class MyRequestsScreen extends StatelessWidget {
                   );
                 }
                 if (!snap.hasData || snap.data!.docs.isEmpty) {
-                  return const _EmptyState(
+                  return _EmptyState(
                     icon: Icons.inbox_outlined,
-                    title: 'No requests yet',
-                    subtitle: 'Your transport requests will show up here once you\nsubmit one.',
+                    title: translate(context, 'No requests yet'),
+                    subtitle: translate(
+                      context,
+                      'Your transport requests will show up here once you\nsubmit one.',
+                    ),
                   );
                 }
                 final docs = [...snap.data!.docs]
@@ -88,7 +93,7 @@ class _ScreenHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'My Requests',
+                  translate(context, 'My Requests'),
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
@@ -97,7 +102,10 @@ class _ScreenHeader extends StatelessWidget {
                 ),
                 SizedBox(height: 2),
                 Text(
-                  'Track the status of your transport requests',
+                  translate(
+                    context,
+                    'Track the status of your transport requests',
+                  ),
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textGray,
@@ -107,12 +115,13 @@ class _ScreenHeader extends StatelessWidget {
               ],
             ),
           ),
+          const AppLanguageSwitcher(compact: true),
           IconButton.filledTonal(
             style: IconButton.styleFrom(
               backgroundColor: AppColors.primary.withValues(alpha: 0.10),
               foregroundColor: AppColors.primary,
             ),
-            tooltip: 'Profile',
+            tooltip: translate(context, 'Profile'),
             icon: const Icon(Icons.person_outline_rounded),
             onPressed: () => Navigator.push(
               context,

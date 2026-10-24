@@ -1,7 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../constants/app_colors.dart';
+import '../../services/app_language.dart';
+import '../../widgets/localized_text.dart' show Text;
 import 'dart:io';
 import '../../services/ocr_service.dart';
 import '../../services/activity_log_service.dart';
@@ -548,6 +550,7 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         title: const Text('Emergency PCR Report'),
+        actions: const [AppLanguageSwitcher(compact: true)],
         elevation: 0,
       ),
       body: SingleChildScrollView(

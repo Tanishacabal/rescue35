@@ -1,12 +1,15 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../constants/app_colors.dart';
+import '../../services/app_language.dart';
 import '../../services/auth_service.dart';
 import '../../services/call_log_service.dart';
 import '../../widgets/design_system.dart';
+import '../../widgets/localized_text.dart' show Text;
 import '../auth/login_screen.dart';
 import '../profile.dart';
+import '../notifications/notifications_screen.dart';
 import 'my_requests_screen.dart';
 import 'request_form_screen.dart';
 
@@ -23,6 +26,7 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
   static const _navItems = [
     _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Home'),
     _NavItem(icon: Icons.receipt_long_outlined, activeIcon: Icons.receipt_long_rounded, label: 'Requests'),
+    _NavItem(icon: Icons.notifications_none_rounded, activeIcon: Icons.notifications_active_rounded, label: 'Alerts'),
     _NavItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Profile'),
   ];
 
@@ -33,12 +37,17 @@ class _CitizenDashboardState extends State<CitizenDashboard> {
     final pages = [
       _HomeTab(onSeeAllRequests: () => _goToTab(1), onConfirmHotline: _confirmHotline),
       const MyRequestsScreen(),
+      const NotificationsScreen(),
       const ProfileScreen(role: 'citizen'),
     ];
 
     // ✅ Standard Scaffold — bottomNavigationBar SIGURADONG GAGANA
     return Scaffold(
       extendBody: true,
+      appBar: AppBar(
+        title: const Text('RESCUE 35'),
+        actions: const [AppLanguageSwitcher()],
+      ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -729,7 +738,7 @@ class _FloatingNavBar extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        item.label,
+                        translate(context, item.label),
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: selected ? FontWeight.bold : FontWeight.normal,

@@ -1,7 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 
 import '../../constants/app_colors.dart';
+import '../../services/app_language.dart';
 import '../../widgets/design_system.dart';
+import '../../widgets/localized_text.dart' show Text;
 import '../auth/login_screen.dart';
 import 'terms_screen.dart';
 
@@ -94,22 +96,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: SafeArea(
         child: Column(
           children: [
-            // Skip button
-            Align(
-              alignment: Alignment.topRight,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 8, right: 20),
-                child: TextButton(
-                  onPressed: _goToTerms,
-                  child: const Text(
-                    'Skip',
-                    style: TextStyle(
-                      color: AppColors.textGray,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
+            Padding(
+              padding: const EdgeInsets.only(top: 8, right: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  const AppLanguageSwitcher(),
+                  TextButton(
+                    onPressed: _goToTerms,
+                    child: Text(
+                      translate(context, 'Skip'),
+                      style: const TextStyle(
+                        color: AppColors.textGray,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
 
@@ -165,7 +169,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     elevation: 0,
                   ),
                   child: Text(
-                    _currentPage == _pages.length - 1 ? 'Get Started' : 'Next',
+                    translate(
+                      context,
+                      _currentPage == _pages.length - 1
+                          ? 'Get Started'
+                          : 'Next',
+                    ),
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -220,7 +229,7 @@ class _OnboardingPage extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              data.badge,
+              translate(context, data.badge),
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
@@ -233,7 +242,7 @@ class _OnboardingPage extends StatelessWidget {
 
           // Title
           Text(
-            data.title,
+            translate(context, data.title),
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 22,
@@ -246,7 +255,7 @@ class _OnboardingPage extends StatelessWidget {
 
           // Subtitle
           Text(
-            data.subtitle,
+            translate(context, data.subtitle),
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 14,

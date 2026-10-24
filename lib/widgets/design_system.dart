@@ -1,8 +1,10 @@
 import 'dart:ui';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 
 import '../constants/app_colors.dart';
+import '../services/app_language.dart';
+import 'localized_text.dart' show Text;
 
 class RescueGradientScaffold extends StatelessWidget {
   final Widget child;
@@ -164,7 +166,7 @@ class PrimaryButton extends StatelessWidget {
               )
             : Icon(icon ?? Icons.arrow_forward_rounded, size: 20),
         label: Text(
-          label,
+          translateText(label),
           style: const TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w800,
@@ -177,9 +179,12 @@ class PrimaryButton extends StatelessWidget {
 
 InputDecoration rescueInputDecoration(String label, IconData icon,
     {String? hint, bool required = true}) {
+  final translatedLabel = translateText(label);
   return InputDecoration(
-    labelText: required ? '$label *' : '$label (Optional)',
-    hintText: hint,
+    labelText: required
+        ? '$translatedLabel *'
+        : '$translatedLabel (${translateText('Optional')})',
+    hintText: hint == null ? null : translateText(hint),
     prefixIcon: Icon(icon, color: AppColors.textGray, size: 20),
     filled: true,
     fillColor: Colors.white.withValues(alpha: 0.96),
@@ -210,56 +215,70 @@ InputDecoration rescueInputDecoration(String label, IconData icon,
 
 String? validateEmail(String? value) {
   final text = value?.trim() ?? '';
-  if (text.isEmpty) return 'Email is required';
+  if (text.isEmpty) return translateText('Email is required');
   final ok = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(text);
-  return ok ? null : 'Enter a valid email address';
+  return ok ? null : translateText('Enter a valid email address');
 }
 
 String? validatePhilippineMobile(String? value) {
   final text = value?.trim() ?? '';
-  if (text.isEmpty) return 'Mobile number is required';
+  if (text.isEmpty) return translateText('Mobile number is required');
   return RegExp(r'^09\d{9}$').hasMatch(text)
       ? null
-      : 'Use 09XXXXXXXXX format';
+      : translateText('Use 09XXXXXXXXX format');
 }
 
 String? validateName(String? value) {
   final text = value?.trim() ?? '';
-  if (text.isEmpty) return 'Name is required';
-  if (text.length < 2) return 'Name must be at least 2 characters';
-  if (text.length > 100) return 'Name must not exceed 100 characters';
+  if (text.isEmpty) return translateText('Name is required');
+  if (text.length < 2) {
+    return translateText('Name must be at least 2 characters');
+  }
+  if (text.length > 100) {
+    return translateText('Name must not exceed 100 characters');
+  }
   final ok = RegExp(r"^[a-zA-Z\s.'-]+$").hasMatch(text);
-  return ok ? null : 'Name can only contain letters, spaces, dots, and hyphens';
+  return ok
+      ? null
+      : translateText(
+          'Name can only contain letters, spaces, dots, and hyphens',
+        );
 }
 
 String? validateAge(String? value) {
   final text = value?.trim() ?? '';
-  if (text.isEmpty) return 'Age is required';
+  if (text.isEmpty) return translateText('Age is required');
   final age = int.tryParse(text);
-  if (age == null) return 'Age must be a valid number';
-  if (age < 0 || age > 150) return 'Age must be between 0 and 150';
+  if (age == null) return translateText('Age must be a valid number');
+  if (age < 0 || age > 150) {
+    return translateText('Age must be between 0 and 150');
+  }
   return null;
 }
 
 String? validatePhoneNumber(String? value) {
   final text = value?.trim() ?? '';
-  if (text.isEmpty) return 'Phone number is required';
+  if (text.isEmpty) return translateText('Phone number is required');
   final clean = text.replaceAll(RegExp(r'[^\d]'), '');
-  if (clean.length < 7) return 'Phone number too short';
+  if (clean.length < 7) return translateText('Phone number too short');
   return null;
 }
 
 String? validateAddress(String? value) {
   final text = value?.trim() ?? '';
-  if (text.isEmpty) return 'Address is required';
-  if (text.length < 5) return 'Address must be at least 5 characters';
-  if (text.length > 200) return 'Address must not exceed 200 characters';
+  if (text.isEmpty) return translateText('Address is required');
+  if (text.length < 5) {
+    return translateText('Address must be at least 5 characters');
+  }
+  if (text.length > 200) {
+    return translateText('Address must not exceed 200 characters');
+  }
   return null;
 }
 
 String? validateNonEmpty(String? value) {
   final text = value?.trim() ?? '';
-  return text.isEmpty ? 'This field is required' : null;
+  return text.isEmpty ? translateText('This field is required') : null;
 }
 
 String sanitizeInput(String value) {

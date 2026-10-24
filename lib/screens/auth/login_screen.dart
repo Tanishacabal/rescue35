@@ -1,8 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 
 import '../../constants/app_colors.dart';
+import '../../services/app_language.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/design_system.dart';
+import '../../widgets/localized_text.dart' show Text;
 import '../citizen/citizen_dashboard.dart';
 import '../responder/responder_dashboard.dart';
 import 'register_screen.dart';
@@ -81,7 +83,8 @@ class _LoginScreenState extends State<LoginScreen> {
         }
         _isLoading = false;
         _errorMessage = error;
-        _passwordAuthError = error == 'Wrong password. Please try again.' ||
+        _passwordAuthError =
+            error == 'Wrong password. Please try again.' ||
             error == 'Login failed. Please try again.';
       });
       return;
@@ -120,7 +123,9 @@ class _LoginScreenState extends State<LoginScreen> {
               controller: emailCtrl,
               keyboardType: TextInputType.emailAddress,
               decoration: rescueInputDecoration(
-                  'Email or mobile number', Icons.person_outline),
+                'Email or mobile number',
+                Icons.person_outline,
+              ),
             ),
             const SizedBox(height: 10),
             const Text(
@@ -148,7 +153,8 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Enter your email or mobile number first.')),
+          content: Text('Enter your email or mobile number first.'),
+        ),
       );
       return;
     }
@@ -177,7 +183,9 @@ class _LoginScreenState extends State<LoginScreen> {
         content: Text(
           error ?? 'Reset link sent. Check your inbox or spam/junk folder.',
         ),
-        backgroundColor: error == null ? AppColors.completed : AppColors.primary,
+        backgroundColor: error == null
+            ? AppColors.completed
+            : AppColors.primary,
         duration: const Duration(seconds: 5),
       ),
     );
@@ -186,177 +194,199 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return RescueGradientScaffold(
-      child: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(22),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.75),
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.8)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.08),
-                        blurRadius: 18,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: const [
-                      RescueLogo(size: 82),
-                      SizedBox(height: 18),
-                      Text(
-                        'RESCUE 35',
-                        style: TextStyle(
-                          color: AppColors.dark,
-                          fontSize: 30,
-                          fontWeight: FontWeight.w900,
+      child: Stack(
+        children: [
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(22),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.75),
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.8),
                         ),
-                      ),
-                      SizedBox(height: 6),
-                      Text(
-                        'Official Emergency Medical Transport Platform',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppColors.textGray,
-                          fontSize: 14,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 22),
-                GlassCard(
-                  padding: const EdgeInsets.all(20),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: const [
-                            Icon(
-                              Icons.lock_outline_rounded,
-                              color: AppColors.primary,
-                            ),
-                            SizedBox(width: 10),
-                            Text(
-                              'Sign in to continue',
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w900,
-                                color: AppColors.dark,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 18),
-                        TextFormField(
-                          controller: _emailCtrl,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                          autocorrect: false,
-                          decoration: rescueInputDecoration(
-                            'Email or mobile number',
-                            Icons.person_outline,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.08),
+                            blurRadius: 18,
+                            offset: const Offset(0, 10),
                           ),
-                          validator: _validateIdentifier,
-                        ),
-                        const SizedBox(height: 14),
-                        TextFormField(
-                          controller: _passwordCtrl,
-                          obscureText: _obscurePass,
-                          onChanged: (_) {
-                            if (_passwordAuthError) {
-                              setState(() => _passwordAuthError = false);
-                            }
-                          },
-                          decoration: rescueInputDecoration(
-                            'Password',
-                            Icons.lock_outline,
-                          ).copyWith(
-                            errorText: _passwordAuthError ? '' : null,
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePass
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                              ),
-                              onPressed: () => setState(
-                                () => _obscurePass = !_obscurePass,
-                              ),
-                            ),
-                          ),
-                          validator: (v) =>
-                              (v ?? '').isEmpty ? 'Password is required' : null,
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Checkbox(
-                              value: _rememberMe,
-                              onChanged: (v) =>
-                                  setState(() => _rememberMe = v ?? false),
-                            ),
-                            const Expanded(child: Text('Remember me')),
-                            TextButton(
-                              onPressed: _forgotPassword,
-                              child: const Text('Forgot Password'),
-                            ),
-                          ],
-                        ),
-                        if (_errorMessage != null) ...[
-                          const SizedBox(height: 4),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          RescueLogo(size: 82),
+                          SizedBox(height: 18),
                           Text(
-                            _errorMessage!,
-                            style: const TextStyle(
-                              color: AppColors.primary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                            'RESCUE 35',
+                            style: TextStyle(
+                              color: AppColors.dark,
+                              fontSize: 30,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            translate(
+                              context,
+                              'Official Emergency Medical Transport Platform',
+                            ),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: AppColors.textGray,
+                              fontSize: 14,
+                              height: 1.5,
                             ),
                           ),
                         ],
-                        const SizedBox(height: 16),
-                        PrimaryButton(
-                          label: 'Login',
-                          icon: Icons.login_rounded,
-                          loading: _isLoading,
-                          onPressed: _login,
-                        ),
-                        const SizedBox(height: 14),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    GlassCard(
+                      padding: const EdgeInsets.all(20),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              "Don't have an account? ",
-                              style: TextStyle(color: AppColors.textGray),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.lock_outline_rounded,
+                                  color: AppColors.primary,
+                                ),
+                                SizedBox(width: 10),
+                                Text(
+                                  translate(context, 'Sign in to continue'),
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
+                                    color: AppColors.dark,
+                                  ),
+                                ),
+                              ],
                             ),
-                            TextButton(
-                              onPressed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const RegisterScreen(),
+                            const SizedBox(height: 18),
+                            TextFormField(
+                              controller: _emailCtrl,
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              autocorrect: false,
+                              decoration: rescueInputDecoration(
+                                'Email or mobile number',
+                                Icons.person_outline,
+                              ),
+                              validator: _validateIdentifier,
+                            ),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: _passwordCtrl,
+                              obscureText: _obscurePass,
+                              onChanged: (_) {
+                                if (_passwordAuthError) {
+                                  setState(() => _passwordAuthError = false);
+                                }
+                              },
+                              decoration:
+                                  rescueInputDecoration(
+                                    'Password',
+                                    Icons.lock_outline,
+                                  ).copyWith(
+                                    errorText: _passwordAuthError ? '' : null,
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscurePass
+                                            ? Icons.visibility_off_outlined
+                                            : Icons.visibility_outlined,
+                                      ),
+                                      onPressed: () => setState(
+                                        () => _obscurePass = !_obscurePass,
+                                      ),
+                                    ),
+                                  ),
+                              validator: (v) => (v ?? '').isEmpty
+                                  ? 'Password is required'
+                                  : null,
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Checkbox(
+                                  value: _rememberMe,
+                                  onChanged: (v) =>
+                                      setState(() => _rememberMe = v ?? false),
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    translate(context, 'Remember me'),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: _forgotPassword,
+                                  child: Text(
+                                    translate(context, 'Forgot Password'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (_errorMessage != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                _errorMessage!,
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              child: const Text('Register'),
+                            ],
+                            const SizedBox(height: 16),
+                            PrimaryButton(
+                              label: translate(context, 'Login'),
+                              icon: Icons.login_rounded,
+                              loading: _isLoading,
+                              onPressed: _login,
+                            ),
+                            const SizedBox(height: 14),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  translate(context, "Don't have an account? "),
+                                  style: TextStyle(color: AppColors.textGray),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const RegisterScreen(),
+                                    ),
+                                  ),
+                                  child: Text(translate(context, 'Register')),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
+          const Positioned(
+            top: 8,
+            right: 12,
+            child: SafeArea(child: AppLanguageSwitcher()),
+          ),
+        ],
       ),
     );
   }
