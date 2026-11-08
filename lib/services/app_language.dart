@@ -144,6 +144,13 @@ const _tagalogTranslations = <String, String>{
   'Tap to Select Pickup Location':
       'Pindutin upang Piliin ang Lugar ng Pagsundo',
   'Select Pickup Time': 'Piliin ang Oras ng Pagsundo',
+  'Edit Schedule': 'I-edit ang Iskedyul',
+  'Select new pickup date': 'Piliin ang bagong petsa ng pagsundo',
+  'Select new pickup time': 'Piliin ang bagong oras ng pagsundo',
+  'This request is no longer available for schedule editing.':
+      'Hindi na maaaring i-edit ang iskedyul ng request na ito.',
+  'Schedule updated. Your request is pending review.':
+      'Na-update ang iskedyul. Naghihintay na muling masuri ang iyong request.',
   'Destination Hospital': 'Ospital na Pupuntahan',
   'Patient Information': 'Impormasyon ng Pasyente',
   'Patient Name': 'Pangalan ng Pasyente',
@@ -166,6 +173,9 @@ const _tagalogTranslations = <String, String>{
   'Profile updated successfully.': 'Matagumpay na na-update ang profile.',
   'Logout': 'Mag-logout',
   'Log Out': 'Mag-logout',
+  'Log out?': 'Mag-logout?',
+  'Are you sure you want to log out?':
+      'Sigurado ka bang gusto mong mag-logout?',
   'Sign out': 'Mag-sign out',
   'Emergency Medical Transport Platform':
       'Plataporma para sa Medical Transport sa Emergency',

@@ -282,59 +282,61 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
     }
   }
 
+  // ── OCR autofill ─────────────────────────────────────────
   void _fillFieldsFromOcr(String text) {
     final normalized = text.replaceAll('\r', '\n');
+
     _setIfFound(
       _patientConditionCtrl,
-      _findLabeledValue(normalized, const ['patient condition', 'condition']),
+      _findLabeledValue(normalized, const ['patient condition']) ??
+          _firstMatch(
+            normalized,
+            RegExp(
+              r'\b(?:unconscious|conscious|unresponsive)\b',
+              caseSensitive: false,
+            ),
+          ),
     );
+
     _setIfFound(
       _presentIllnessCtrl,
       _findLabeledValue(normalized, const [
+        'history of present illness',
         'present illness',
         'chief complaint',
         'complaint',
       ], multiLine: true),
     );
+
     _setIfFound(
       _pastMedicalHistoryCtrl,
       _findLabeledValue(normalized, const [
         'past medical history',
+        'past health history',
         'medical history',
         'pmh',
       ], multiLine: true),
     );
+
     _setIfFound(
       _painLocationCtrl,
       _findLabeledValue(normalized, const [
         'pain location',
         'location of pain',
-      ]),
+        'locations',
+      ])?.replaceFirst(
+        RegExp(r'^\(\+\)\s*pain\s*[-:]?\s*', caseSensitive: false),
+        '',
+      ),
     );
-    _setIfFound(
-      _bpCtrl,
-      _firstMatch(normalized, RegExp(r'\b\d{2,3}/\d{2,3}\b')),
-    );
-    _setIfFound(
-      _pulseRateCtrl,
-      _findNumberAfterLabels(normalized, const ['pulse rate', 'pulse', 'pr']),
-    );
-    _setIfFound(
-      _temperatureCtrl,
-      _findNumberAfterLabels(normalized, const ['temperature', 'temp']),
-    );
-    _setIfFound(
-      _respiratoryRateCtrl,
-      _findNumberAfterLabels(normalized, const [
-        'respiratory rate',
-        'respiration',
-        'rr',
-      ]),
-    );
+
+    _fillVitalsFromOcr(normalized);
+
     _setIfFound(
       _spo2Ctrl,
       _findNumberAfterLabels(normalized, const ['spo2', 'sp02', 'oxygen']),
     );
+
     _setIfFound(
       _timeCtrl,
       _firstMatch(
@@ -342,14 +344,98 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
         RegExp(r'\b(?:[01]?\d|2[0-3])[:.][0-5]\d(?:\s?[AaPp][Mm])?\b'),
       )?.replaceAll('.', ':'),
     );
-    _setIfFound(
-      _actionTakenCtrl,
-      _findLabeledValue(normalized, const [
-        'action taken',
-        'interventions',
-        'treatment',
-      ], multiLine: true),
-    );
+
+    _setIfFound(_actionTakenCtrl, _findActionTaken(normalized));
+  }
+
+  /// Vital signs (Patient No. 1). Hindi umaasa sa labels dahil hiwalay
+  /// ang labels at values sa OCR. Gumagamit ng normal range bilang anchor,
+  /// at ng pagkakasunod ng mga numero pagkatapos ng BP bilang fallback.
+  void _fillVitalsFromOcr(String text) {
+    final t = text.replaceAll(RegExp(r'[–—]'), '-');
+
+    // BP: unang xxx/xx na hindi 120/80 (normal range)
+    String? bp;
+    var bpEnd = -1;
+    for (final m in RegExp(
+      r'(?<!\d)(\d{2,3})\s*/\s*(\d{2,3})(?!\d)',
+    ).allMatches(t)) {
+      final sys = int.parse(m.group(1)!);
+      final dia = int.parse(m.group(2)!);
+      if (sys == 120 && dia == 80) continue;
+      if (sys < 60 || sys > 260 || dia < 30 || dia > 160 || sys <= dia) {
+        continue;
+      }
+      bp = '$sys/$dia';
+      bpEnd = m.end;
+      break;
+    }
+
+    String? pick(String pattern) =>
+        RegExp(pattern).firstMatch(t)?.group(1)?.replaceAll(',', '.');
+
+    var pr = pick(r'60\s*-\s*100\s*\)?\s*(\d{2,3})(?!\d)');
+    var bt = pick(r'(?<!\d)37(?:\.0)?\s*\)?\s*(\d{2}(?:[.,]\d)?)(?!\d)');
+    var rr = pick(r'12\s*-\s*20\s*\)?\s*(\d{1,2})(?!\d)');
+
+    // Fallback: mga numero na kasunod ng BP, in order: PR, BT, RR
+    if ((pr == null || bt == null || rr == null) && bpEnd >= 0) {
+      final rest = t
+          .substring(bpEnd)
+          .replaceAll(RegExp(r'\([^)]*\)'), ' ')
+          .replaceAll(RegExp(r'\d+\s*-\s*\d+'), ' ')
+          // Idugtong ang numerong hinati ng OCR (hal. "9 2" -> "92")
+          .replaceAllMapped(
+            RegExp(r'(?<![\d.])(\d)\s+(\d)(?![\d.])'),
+            (m) => '${m.group(1)}${m.group(2)}',
+          );
+      final nums = RegExp(r'(?<![\d.])\d{1,3}(?:[.,]\d)?(?!\d)')
+          .allMatches(rest)
+          .map((m) => m.group(0)!.replaceAll(',', '.'))
+          .take(12)
+          .toList();
+      bool isInt(String n) => !n.contains('.');
+      var idx = 0;
+      String? next(bool Function(String) ok) {
+        while (idx < nums.length) {
+          final n = nums[idx++];
+          if (ok(n)) return n;
+        }
+        return null;
+      }
+
+      // PR at RR: buong numero lang (walang decimal). BT: may decimal.
+      pr ??= next((n) {
+        final v = double.parse(n);
+        return isInt(n) && v >= 30 && v <= 220;
+      });
+      bt ??= next((n) {
+        final v = double.parse(n);
+        return !isInt(n) && v >= 34 && v <= 42;
+      });
+      rr ??= next((n) {
+        final v = double.parse(n);
+        return isInt(n) && v >= 6 && v <= 60;
+      });
+    }
+
+    if (bt != null) {
+      final v = double.tryParse(bt);
+      if (v == null || v < 34 || v > 42) bt = null;
+    }
+
+    // Last resort para sa temperature: kahit anong xx.x sa 34–42 (hal. 36.8)
+    if (bt == null) {
+      final m = RegExp(
+        r'(?<!\d)(3[4-9]|4[0-2])\s*[.,]\s*(\d)(?!\d)',
+      ).firstMatch(t);
+      if (m != null) bt = '${m.group(1)}.${m.group(2)}';
+    }
+
+    _setIfFound(_bpCtrl, bp);
+    _setIfFound(_pulseRateCtrl, pr);
+    _setIfFound(_temperatureCtrl, bt);
+    _setIfFound(_respiratoryRateCtrl, rr);
   }
 
   void _setIfFound(TextEditingController controller, String? value) {
@@ -373,9 +459,11 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
       'response type',
       'patient condition',
       'condition',
+      'history of present illness',
       'present illness',
       'chief complaint',
       'past medical history',
+      'past health history',
       'medical history',
       'pain location',
       'bp',
@@ -389,8 +477,13 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
       'sp02',
       'time',
       'action taken',
+      'action/',
       'interventions',
       'treatment',
+      'responders',
+      'endorsement',
+      'address',
+      'ambulance unit',
     ];
 
     for (var i = 0; i < lines.length; i++) {
@@ -404,9 +497,10 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
       }
       if (foundLabel == null) continue;
 
+      // Tinatanggal din ang "/s:" sa "Chief Complaint/s:"
       final sameLine = lines[i]
           .substring(lower.indexOf(foundLabel) + foundLabel.length)
-          .replaceFirst(RegExp(r'^\s*[:\-]\s*'), '')
+          .replaceFirst(RegExp(r'^\s*(?:/\s*s)?\s*[:\-]\s*'), '')
           .trim();
       if (sameLine.isNotEmpty) return sameLine;
 
@@ -416,6 +510,142 @@ class _PCRStandaloneFormScreenState extends State<PCRStandaloneFormScreen> {
       for (var j = i + 1; j < lines.length; j++) {
         final nextLower = lines[j].toLowerCase();
         if (allLabels.any(nextLower.contains)) break;
+        collected.add(lines[j]);
+      }
+      if (collected.isNotEmpty) return collected.join('\n');
+    }
+    return null;
+  }
+
+  // Regex para makilala ang label ng vital sign sa isang linya
+  static final _vitalLabelPattern = RegExp(
+    r'(?<![a-z])(bp|pr|bt|rr|temp|pulse|spo2)(?![a-z])',
+    caseSensitive: false,
+  );
+
+  // Tinatanggal ang units/normal range na nasa ( ) at ang ranges (hal. 60-100)
+  String _cleanVitalText(String s) => s
+      .replaceAll(RegExp(r'\([^)]*\)'), ' ')
+      .replaceAll(RegExp(r'\d+\s*[-–]\s*\d+'), ' ');
+
+  /// Kinukuha ang value ng Patient No. 1 sa vital signs table.
+  String? _findVital(
+    String text,
+    List<String> labels,
+    RegExp valuePattern, {
+    bool preferSecondIfNoParens = false,
+  }) {
+    final lines = text
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+
+    for (var i = 0; i < lines.length; i++) {
+      final lower = lines[i].toLowerCase();
+      for (final label in labels) {
+        final m = RegExp(
+          '(?<![a-z])${RegExp.escape(label)}(?![a-z])',
+        ).firstMatch(lower);
+        if (m == null) continue;
+
+        final rest = lines[i].substring(m.end);
+        final cleaned = _cleanVitalText(rest);
+        final matches = valuePattern.allMatches(cleaned).toList();
+
+        if (matches.isNotEmpty) {
+          // Kung walang ( ) at may 2 values, ang una ay normal range
+          if (preferSecondIfNoParens &&
+              !rest.contains('(') &&
+              matches.length >= 2) {
+            return matches[1].group(0);
+          }
+          return matches.first.group(0);
+        }
+
+        // Fallback: baka nasa susunod na linya ang value (column-by-column OCR)
+        for (var j = i + 1; j < lines.length && j <= i + 3; j++) {
+          if (_vitalLabelPattern.hasMatch(lines[j].toLowerCase())) break;
+          final next = valuePattern.firstMatch(_cleanVitalText(lines[j]));
+          if (next != null) return next.group(0);
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Hinahanap ang value sa tabi ng standard normal range ng form
+  /// (hal. "(120/80) 130/90"), kahit hiwalay ang labels sa values sa OCR.
+  String? _normalRangeValue(String text, String pattern) {
+    return RegExp(pattern).firstMatch(text)?.group(1)?.replaceAll(' ', '');
+  }
+
+  // Linya ng vital signs table (header, labels, numbers) na hindi dapat
+  // mapasama sa Action Taken.
+  bool _isVitalNoise(String line) {
+    final stripped = line
+        .toLowerCase()
+        .replaceAll(
+          RegExp(
+            r'\b(vital|signs?|normal|patient|no|nol|noi|bp|pr|bt|rr|mmhg|bpm|cpm)\b',
+          ),
+          '',
+        )
+        .replaceAll(RegExp(r'[\d\s()/.\-–:°c,]'), '');
+    return stripped.isEmpty;
+  }
+
+  /// Kinukuha ang "ACTION/'S TAKEN:" hanggang bago ang RESPONDERS,
+  /// nilalaktawan ang mga linya ng vital signs table.
+  /// Action Taken: una, hinahanap ang mga linyang nagsisimula sa karaniwang
+  /// action verbs (Assessed, Controlled, Monitored, Transported...), kahit
+  /// saan sa scan lumabas. Kung wala, gamitin ang "ACTION/'S TAKEN" label.
+  String? _findActionTaken(String text) {
+    final verbRe = RegExp(
+      r'^[\W\d]*(?:assess|control|monitor|administ|appl(?:y|ied)|transport|'
+      r'load|perform|gave|given|immobili|clean|dress|splint|check|provid|'
+      r'initiat|secur|bandag|insert|obtain|elevat|stabili|extric|ventilat|'
+      r'suction|oxygen|cpr|c-collar|cervical)',
+      caseSensitive: false,
+    );
+    final lines = text
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty && l.length > 6)
+        .toList();
+    final actions = lines.where((l) => verbRe.hasMatch(l)).toList();
+    if (actions.isNotEmpty) return actions.join('\n');
+    return _findActionTakenByLabel(text);
+  }
+
+  String? _findActionTakenByLabel(String text) {
+    final lines = text
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+    final labelRe = RegExp(r"action\W*s?\W*taken", caseSensitive: false);
+    final stopRe = RegExp(
+      r'responders|endorsement|received by|waiver|verified and checked',
+      caseSensitive: false,
+    );
+
+    for (var i = 0; i < lines.length; i++) {
+      final m = labelRe.firstMatch(lines[i]);
+      if (m == null) continue;
+
+      final collected = <String>[];
+      final sameLine = lines[i]
+          .substring(m.end)
+          .replaceFirst(RegExp(r'^\s*[:\-]\s*'), '')
+          .trim();
+      if (sameLine.isNotEmpty && !_isVitalNoise(sameLine)) {
+        collected.add(sameLine);
+      }
+
+      for (var j = i + 1; j < lines.length; j++) {
+        if (stopRe.hasMatch(lines[j])) break;
+        if (_isVitalNoise(lines[j])) continue;
         collected.add(lines[j]);
       }
       if (collected.isNotEmpty) return collected.join('\n');

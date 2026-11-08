@@ -7,6 +7,7 @@ import '../../services/auth_service.dart';
 import '../../services/call_log_service.dart';
 import '../../widgets/design_system.dart';
 import '../../widgets/localized_text.dart' show Text;
+import '../../widgets/logout_confirmation_dialog.dart';
 import '../auth/login_screen.dart';
 import '../profile.dart';
 import '../notifications/notifications_screen.dart';
@@ -240,6 +241,10 @@ class _Header extends StatelessWidget {
             tooltip: 'Logout',
             icon: const Icon(Icons.logout_rounded),
             onPressed: () async {
+              if (!await showLogoutConfirmationDialog(context) ||
+                  !context.mounted) {
+                return;
+              }
               await AuthService().logout();
               if (context.mounted) {
                 Navigator.pushReplacement(

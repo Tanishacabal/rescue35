@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../constants/app_colors.dart';
+import '../../services/activity_log_service.dart';
 import '../../services/app_language.dart';
 import '../../widgets/design_system.dart';
 import '../../widgets/localized_text.dart' show Text;
@@ -264,6 +265,129 @@ class _RequestCardState extends State<_RequestCard> {
     return word[0].toUpperCase() + word.substring(1).toLowerCase();
   }
 
+  TimeOfDay _parseScheduleTime(String value) {
+    final match = RegExp(
+      r'^(\d{1,2}):(\d{2})\s*(AM|PM)$',
+      caseSensitive: false,
+    ).firstMatch(value.trim());
+    if (match == null) return TimeOfDay.now();
+
+    var hour = int.parse(match.group(1)!);
+    final minute = int.parse(match.group(2)!);
+    final period = match.group(3)!.toUpperCase();
+    if (hour < 1 || hour > 12 || minute > 59) return TimeOfDay.now();
+    if (period == 'AM') {
+      if (hour == 12) hour = 0;
+    } else if (hour != 12) {
+      hour += 12;
+    }
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  String _formatScheduleTime(TimeOfDay time) {
+    final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+    final minute = time.minute.toString().padLeft(2, '0');
+    final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour:$minute $period';
+  }
+
+  Future<void> _editRejectedSchedule(Map<String, dynamic> requestData) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final lastDate = DateTime(now.year + 5, now.month, now.day);
+    final scheduleValue = requestData['scheduleDate'];
+    final currentDate = scheduleValue is Timestamp
+        ? scheduleValue.toDate()
+        : today;
+    final initialDate = currentDate.isBefore(today)
+        ? today
+        : currentDate.isAfter(lastDate)
+        ? lastDate
+        : currentDate;
+
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: today,
+      lastDate: lastDate,
+      helpText: translate(context, 'Select new pickup date'),
+    );
+    if (date == null || !mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: _parseScheduleTime(
+        (requestData['scheduleTime'] ?? '').toString(),
+      ),
+      helpText: translate(context, 'Select new pickup time'),
+    );
+    if (time == null || !mounted) return;
+
+    try {
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      final wasUpdated = await FirebaseFirestore.instance.runTransaction<bool>((
+        transaction,
+      ) async {
+        final snapshot = await transaction.get(widget.doc.reference);
+        final latestData = snapshot.data();
+        if (!snapshot.exists ||
+            latestData is! Map<String, dynamic> ||
+            latestData['status'] != 'rejected' ||
+            latestData['userID'] != uid) {
+          return false;
+        }
+
+        transaction.update(widget.doc.reference, {
+          'scheduleDate': Timestamp.fromDate(
+            DateTime(date.year, date.month, date.day),
+          ),
+          'scheduleTime': _formatScheduleTime(time),
+          'status': 'pending',
+          'timeline': FieldValue.arrayUnion(['Schedule Updated']),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        return true;
+      });
+
+      if (!mounted) return;
+      if (!wasUpdated) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'This request is no longer available for schedule editing.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      await ActivityLogService.log(
+        action: 'transport_request_schedule_updated',
+        description:
+            'Updated the schedule for request ${widget.doc.id} after rejection.',
+        entityType: 'transport_request',
+        entityId: widget.doc.id,
+        metadata: {
+          'scheduleDate': Timestamp.fromDate(
+            DateTime(date.year, date.month, date.day),
+          ),
+          'scheduleTime': _formatScheduleTime(time),
+        },
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Schedule updated. Your request is pending review.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to update schedule: $error')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>?>(
@@ -456,6 +580,20 @@ class _RequestCardState extends State<_RequestCard> {
                       ),
                       secondChild: const SizedBox.shrink(),
                     ),
+                    if (status == 'rejected') ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _editRejectedSchedule(requestData),
+                          icon: const Icon(Icons.edit_calendar_outlined),
+                          label: Text('Edit Schedule'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.rejected,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -470,6 +608,7 @@ class _RequestCardState extends State<_RequestCard> {
         'approved' => AppColors.secondary,
         'in-transit' => AppColors.accent,
         'completed' => AppColors.completed,
+        'rejected' => AppColors.rejected,
         _ => AppColors.pending,
       };
 }
